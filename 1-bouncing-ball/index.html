@@ -1,0 +1,351 @@
+<P>I've been saying I will write a lengthy description of my
+experiments with SDL in Perl for a while, today
+kthakore <a href="http://search.cpan.org/~kthakore/SDL-2.3_5/">uploaded
+a SDL experimental version</A> with all the code involved in this
+experiments. So I decided to start, but I decided to make it a serial
+post. I'm still unsure about how the format will look like for the
+rest of the posts, but I certainly would love any comment with ideas
+of where I should go next.</P>
+
+<P>So at the first post, I'll try to make a very simple application:
+"bouncing ball". It is simply a ball bouncing in the screen, where the
+left and right cursors will accelerate them to each side.
+
+<h4>Starting the environment</h4>
+
+<p>Well, at first you need version 2.3_5 or greater of the SDL
+module <a href="http://search.cpan.org/~kthakore/SDL-2.3_5/">available
+here</a>. Building the SDL perl binding will require the headers for
+most of the sdl related libraries. If you're in a Debian machine (or
+most debian-based distros) you can simply install the regular version
+of the SDL perl bindings. You can also do:
+
+<pre>
+# apt-get build-dep libsdl-perl
+</pre>
+
+<p>This line requires you to have a deb-src line in your
+/etc/apt/sources.list. Mine looks like:
+
+<pre>
+deb-src http://ftp.br.debian.org/debian lenny main
+</pre>
+
+<p>In the case you change your sources.list file, remember you need to
+call apt-get update for it to get the new info.
+
+<P>After that you can simply download SDL 2.3_5 from CPAN and follow
+the README instructions, which basically means (note that this version
+is experimental so you might notice some failing tests):
+
+<pre>
+# perl Build.PL
+# ./Build
+# ./Build test
+# ./Build install
+</pre>
+
+<P>You might setup a local::lib if you still want to run other
+applications that require the older and stable version of SDL (yes,
+there are a lot of API changes). I'm not a Windows user, but it has
+been reported that it works like charm when
+using <a href="http://www.strawberryperl.com">Strawberry Perl</a>.
+
+<P>If everything is fine, you should be able to get "2.35" when you
+do:
+
+<pre>
+$ perl -MSDL -E 'say $SDL::VERSION'
+</pre>
+
+<P>You might always get into #sdl@irc.perl.org if you run into
+trouble.
+
+<h4>The way I write games</h4>
+
+<P>Alright, before getting into the technicalities of how to write a
+game with SDL in Perl, let's think a bit on the mechanics of how a
+game works.
+
+<p>The first thing to realize is that a game needs to simulate some
+universe, and that this universe needs to have some universal rules
+like the physics you apply. For instance, it is very important that
+you decide, from the beggining, if you're going to have gravity in
+your game.
+
+<P>The second thing to realize is that, even if we have the impression
+that the time is a continuum, time is actually a sequence of events,
+like the shutter of a camera in burst mode (okay, for the not
+interested in photography, think in stop motion). That basically
+means: in frame A the ball was at position 10,10 and in frame B it was
+at 20,30. There's no in-between, you don't have to worry about it. You
+might be wondering if a collision might be lost in that move, but the
+point is, if the machine can't evaluate enough frames per second as to
+avoid that, it probably wouldn't be able to evaluate a more
+ellaborated calculation of the tragetories to see if they would have
+collided.
+
+<P>This provides an important simplification on how to think your game
+model. In this first example I'm going to overlook the modelling for
+interaction with different objects, since we have just a bouncing
+ball.
+
+<p>One last thing before we go on. You might be tempted to use pixels
+as your measuring unit, there's one important aspect to keep in
+mind. A Pixel is an integer value, which means that you'll need to do
+roundings for each frame. And if you need to store it as a integer
+value, you're going to accumulate imprecision, which might lead to
+weird effects, specially when the fps rate changes dramatically. My
+suggestion is to stick with the good old international measuring
+system and just use meters, a simple calculation can covert from/to
+pixels.
+
+<pre>
+package Util;
+use strict;
+use warnings;
+our $DPI = 96; # I think there's a sane way to fetch this value
+sub m2px { int(((shift) * ($DPI / 0.0254)) + 0.5) }
+sub px2m { (shift) / ($DPI / .0254) }
+</pre>
+
+<h4>Modelling the ball</h4>
+
+<P>I think there probably isn't a better fit for Object Orientation
+than games, since you're actually dealing with simulated objects, and
+the most obvious choice is to use object orientation to work with
+it. So that's the attributes I can think right now to our object.
+
+<pre>
+package Ball;
+use Moose;
+
+use constant g => 1.5;
+use Util;
+use SDL::Rect;
+
+# how much space does it take
+has radius => (is => 'rw', isa => 'Num', default => 0.005);
+
+# Position - vertical and horizontal
+has pos_v => (is => 'rw', isa => 'Num', default => 0.1);
+has pos_h => (is => 'rw', isa => 'Num', default => 0.04);
+
+# Velocty - vertical and horizontal
+has vel_v => (is => 'rw', isa => 'Num', default => 0);
+has vel_h => (is => 'rw', isa => 'Num', default => 0);
+
+# Current acceleration - vertical and horizontal
+# gravity is added later
+has acc_v => (is => 'rw', isa => 'Num', default => 0);
+has acc_h => (is => 'rw', isa => 'Num', default => 0);
+</pre>
+
+<p>With our virtual ball defined, we need to implement the simulation
+of time. And again, we need to think that time is not a continuum, so
+what we do is providing a "time_lapse" method that will recalculate
+the attributes of our object according to the ammount of time past.
+
+<pre>
+sub time_lapse {
+  my ($self, $old_time, $new_time, $height, $width) = @_;
+  my $elapsed = ($new_time - $old_time)/1000; # convert to seconds...
+
+  # now simple mechanics...
+  $self->vel_h( $self->vel_h + $self->acc_h * $elapsed );
+  # and add gravity for vertical velocity.
+  $self->vel_v( $self->vel_v + ($self->acc_v - g) * $elapsed );
+
+  # finally get the new position
+  $self->pos_v( $self->pos_v + $self->vel_v * $elapsed );
+  $self->pos_h( $self->pos_h + $self->vel_h * $elapsed );
+
+  # this ball is supposed to bounce, so let's check $width and $height
+  # if we're out of bounds, we assume a 100% efficient bounce.
+  if ($self->pos_v < 0) {
+    $self->pos_v($self->pos_v * -1);
+    $self->vel_v($self->vel_v * -1);
+  } elsif ($self->pos_v > $height) {
+    $self->pos_v($height - ($self->pos_v - $height));
+    $self->vel_v($self->vel_v * -1);
+  }
+
+  if ($self->pos_h < 0) {
+    $self->pos_h($self->pos_h * -1);
+    $self->vel_h($self->vel_h * -1);
+  } elsif ($self->pos_h > $width) {
+    $self->pos_h($width - ($self->pos_h - $width));
+    $self->vel_h($self->vel_h * -1);
+  }
+
+
+}
+</pre>
+
+<h4>From the simulated universe to pixels</h4>
+
+<P>You probably noticed that we haven't talked much about the game
+development per se, so let's start thinking about it
+
+<p>The first difference from the simulated universe and the actual
+game is the coordinate system. In our universe the vertical position 0
+is near the floor, but in the screen, the vertical position 0 is at
+the top of the screen.
+
+<p>The other difference, which I already mentioned, is that our
+measures are in meters, and the screen is measured in pixels. The
+SDL library provides an important class to interact with this issue,
+the SDL::Rect.
+
+<P>That way, we're going to have a method to return a rect - but we
+need to remember to only return a rect that is inside the expected
+bounds, otherwise SDL will throw an exception.
+
+<pre>
+sub get_rect {
+  my ($self, $height, $width) = @_;
+
+  my $inverted_v = $height - $self->pos_v;
+
+  my $x = Util::m2px( $self->pos_h - $self->radius );
+  my $y = Util::m2px( $inverted_v - $self->radius );
+  my $h = Util::m2px( $self->radius * 2 );
+  my $w = Util::m2px( $self->radius * 2 );
+
+  my $screen_w = Util::m2px( $width );
+  my $screen_h = Util::m2px( $height );
+
+  if ($x < 0) {
+    $w += $x;
+    $x = 0;
+  }
+
+  if ($x + $w > $screen_w) {
+    $w -= ($x + $w) - $screen_w;
+  }
+
+  if ($y < 0) {
+    $h += $y;
+    $h = 0;
+  }
+
+  if ($y + $h > $screen_h) {
+    $h -= ($y + $h) - $screen_h;
+  }
+
+  return SDL::Rect->new( $x, $y, $w, $h );
+}
+</pre>
+
+<h4>Painting</h4>
+
+<p>The last part is actually drawing the ball, which involves painting
+the ball in the correct place. In our first version, our ball will be
+a square, since it's the most primitive drawing we have and I don't
+want to get into that specifics.
+
+<pre>
+my $color;
+sub draw {
+  my ($self, $surface, $height, $width) = @_;
+  unless ($color) {
+    $color = SDL::Video::map_RGB
+      ( $surface->format(),
+        0, 0, 255 ); # blue
+  }
+  SDL::Video::fill_rect
+      ( $surface,
+        $self->get_rect($height, $width),
+        $color );
+}
+</pre>
+
+<p>Yeah, I know, it's an ugly ball, but it bounces... ;)
+
+<h4>Putting the pieces together</h4>
+
+<P>Now we just need the actual application to use our Ball. Note that
+the cycle is basically:
+
+<ul>
+<li>Listen for events
+<li>Evaluete the time_lapse
+<li>Draw the background
+<li>Draw the ball
+<li>Update the parts of the screen that where changed
+<li>Ask for a delay to keep the desired fps rate
+</ul>
+
+<p>Note that I could have asked for it to update the entire screen
+instead of only the parts that were changed, but that particular
+operation is actually the most expensive thing you can have in your
+app, so we try to update as few parts of the screen as possible.
+
+<pre>
+#!/usr/bin/perl
+
+use 5.10.0;
+use strict;
+use warnings;
+
+use SDL;
+use SDL::Video;
+use SDL::App;
+use SDL::Events;
+use SDL::Event;
+use SDL::Time;
+
+use lib 'lib';
+use Util;
+use Ball;
+
+my $ball = Ball->new;
+my $width = 0.2;
+my $height = 0.15;
+my $fps = 60;
+
+my $app = SDL::App->new
+  ( -title => 'Bouncing Ball',
+    -width => Util::m2px($width),
+    -height => Util::m2px($height));
+
+my $black = SDL::Video::map_RGB
+  ( $app->format(),
+    0, 0, 0 ); # black
+
+my $event = SDL::Event->new();
+my $time = SDL::get_ticks;
+my $app_rect = SDL::Rect->new(0, 0, $app->w, $app->h);
+my $ball_rect = $ball->get_rect($height, $width);
+
+while (1) {
+  my $oldtime = $time;
+  my $now = SDL::get_ticks;
+
+  while (SDL::Events::poll_event($event)) {
+    exit if $event->type == SDL_QUIT;
+  }
+
+  my $old_ball_rect = $ball_rect;
+
+  $ball->time_lapse($oldtime, $now, $height, $width);
+
+  $ball_rect = $ball->get_rect($height, $width);
+
+  SDL::Video::fill_rect
+      ( $app,
+        $app_rect,
+        $black );
+
+  $ball->draw($app, $height, $width);
+
+  SDL::Video::update_rects
+      ( $app,
+        $old_ball_rect, $ball_rect );
+
+  $time = SDL::get_ticks;
+  if (($time - $oldtime) < (1000/$fps)) {
+    SDL::delay((1000/$fps) - ($time - $oldtime));
+  }
+}
+</pre>
