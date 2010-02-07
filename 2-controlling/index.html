@@ -1,0 +1,120 @@
+<P>Following <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">the
+first post</A> on the subject of writing games in Perl, where we
+created a bouncing ball (I know, it is a rectangle, but I trust your
+imagination), this post is going to add something very important when
+dealing with games: input.
+
+<P><A href="http://silveiraneto.net">Silveira Neto</a> suggested that
+I should include more specific instructions on how to start the game
+(and maybe a video), so I recalled that I didn't mention that all the
+sources for this posts (including the text) is currently hosted at a
+<a href="http://github.com/ruoso/games-perl">github repository</a> (if
+you plan to contribute, please just ask me for commit permissions
+instead of forking the repo).
+
+<P>So if you want to run the codes posted here, you first need to:
+
+<PRE>
+$ git clone http://github.com/ruoso/games-perl.git
+</PRE>
+
+<P>You can check for updates by calling
+
+<PRE>
+$ git pull origin master
+</PRE>
+
+<P>from inside the games-perl directory. Each directory inside
+games-perl starts with the number of the post. The first post is
+inside the <TT>1-bouncing-ball</TT> directory and the second is in
+<TT>2-controlling</TT>. To run the the first code just get inside the
+first directory and call:
+
+<Pre>
+$ perl ball.pl
+</Pre>
+
+<P>The second example code is based on the first, so the script name
+is the same, so just get into the other directory and run the same
+line. If you get an error like:
+
+<PRE>
+Can't locate SDL/Video.pm in @INC (@INC contains: /etc/perl
+/usr/local/lib/perl/5.10.0 /usr/local/share/perl/5.10.0 /usr/lib/perl5
+/usr/share/perl5 /usr/lib/perl/5.10 /usr/share/perl/5.10
+/usr/local/lib/site_perl .) at ball.pl line 8.
+</PRE>
+
+<P>It means you probably don't have the newest SDL, take a look at
+the <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">first
+post</A> to see how to get the newest redesigned SDL.
+
+<h4>Controlling the Ball</h4>
+
+<P>Enough for the introduction, let's get to the actual code. The
+first thing we need is understanding SDL Events. If you ever
+programmed GUI applications or even if you wrote some javascript you
+are aware of how an event framework looks like. SDL is no exception,
+you need to wait (or poll) for the events, and each event will contain
+the information you need to figure out what happened.
+
+<P>In our case, we want to apply additional acceleration to the ball
+whenever the arrow keys are pressed. But if we have an event-based
+system, the way to figure out which of those four keys is currently
+pressed is keeping a state mask and update it when you receive keydown
+and keyup events.
+
+<P>So what we're going to do is to manipulate the <TT>acc_h</TT>
+and <TT>acc_v</TT> ball attributes depending on the keydown and keyup
+events. It might look complicated, but the only change we need is
+(this is inside ball.pl main loop):
+
+<PRE>
+  while (SDL::Events::poll_event($event)) {
+    if ($event->type == SDL_QUIT) {
+      exit;
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_LEFT) {
+      $ball->acc_h(-1);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_LEFT) {
+      $ball->acc_h(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_RIGHT) {
+      $ball->acc_h(1);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_RIGHT) {
+      $ball->acc_h(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_UP) {
+      $ball->acc_v(1);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_UP) {
+      $ball->acc_v(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_DOWN) {
+      $ball->acc_v(-1);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_DOWN) {
+      $ball->acc_v(0);
+
+    }
+  }
+</PRE>
+
+<P>So, this is it. Follows a small video of the game.
+
+<object width="425" height="344"><param name="movie"
+value="http://www.youtube.com/v/On8O7jJP_WI&hl=pt_BR&fs=1&"></param><param name="allowFullScreen"
+value="true"></param><param name="allowscriptaccess"
+value="always"></param><embed src="http://www.youtube.com/v/On8O7jJP_WI&hl=pt_BR&fs=1&"
+type="application/x-shockwave-flash" allowscriptaccess="always"
+allowfullscreen="true" width="425" height="344"></embed></object>
