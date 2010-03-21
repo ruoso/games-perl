@@ -105,11 +105,13 @@ while (1) {
           $ball->cen_v($ball->cen_v + ($movement_after_collision_v * -2));
           $ball->vel_v($ball->vel_v * -1);
       } elsif (ref $coll->axis eq 'ARRAY') {
-          my ($xv, $yv) = @{$coll->axis};
-          $ball->cen_h($ball->cen_h + ($movement_after_collision_h * -2));
-          $ball->vel_h($ball->vel_h * -1);
-          $ball->cen_v($ball->cen_v + ($movement_after_collision_v * -2));
-          $ball->vel_v($ball->vel_v * -1);
+          my ($xv, $yv) = @{$coll->bounce_vector};
+          $ball->cen_h($ball->cen_h + ($movement_after_collision_h * -1) +
+                       ($xv * $collision_remaining_time));
+          $ball->vel_h($xv);
+          $ball->cen_v($ball->cen_v + ($movement_after_collision_v * -1) +
+                       ($yv * $collision_remaining_time));
+          $ball->vel_v($yv);
       } else {
           warn 'BAD BALL!';
           $ball = Ball->new;
