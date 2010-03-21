@@ -1,0 +1,171 @@
+<P>Following
+posts <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">1</A>
+and <a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">2</A>
+on the subject of writing games in Perl, now we are going to add
+colision.</P>
+
+<P>The idea is quite simple, we are going to add another square to the
+game, and when the ball hits it, it will change direction. Following
+the way we were working, I'm going to add another object, called
+Wall.</P>
+
+<P>The first thing is modelling our wall, which will be a rectangle,
+so it has the following attributes.</P>
+
+<PRE>
+package Wall;
+use Moose;
+use Util;
+use SDL::Rect;
+
+# Position - vertical and horizontal
+has pos_v => (is => 'rw', isa => 'Num', default => 0);
+has pos_h => (is => 'rw', isa => 'Num', default => 0.12);
+
+# Width and height
+has width => (is => 'rw', isa => 'Num', default => 0.005);
+has height => (is => 'rw', isa => 'Num', default => 0.4);
+</PRE>
+
+<P>Unlike the ball, a wall doesn't move, so we don't need a time_lapse
+method, but we still have the get_rect and draw methods.</P>
+
+<PRE>
+sub get_rect {
+  my ($self, $height, $width) = @_;
+
+  my $inverted_v = ($height - ($self->pos_v + $self->height));
+
+  my $x = Util::m2px( $self->pos_h );
+  my $y = Util::m2px( $inverted_v );
+  my $h = Util::m2px( $self->height );
+  my $w = Util::m2px( $self->width );
+
+  my $screen_w = Util::m2px( $width );
+  my $screen_h = Util::m2px( $height );
+
+  if ($x < 0) {
+    $w += $x;
+    $x = 0;
+  }
+
+  if ($x + $w > $screen_w) {
+    $w -= ($x + $w) - $screen_w;
+  }
+
+  if ($y < 0) {
+    $h += $y;
+    $h = 0;
+  }
+
+  if ($y + $h > $screen_h) {
+    $h -= ($y + $h) - $screen_h;
+  }
+
+  return SDL::Rect->new( $x, $y, $w, $h );
+}
+
+my $color;
+sub draw {
+  my ($self, $surface, $height, $width) = @_;
+  unless ($color) {
+    $color = SDL::Video::map_RGB
+      ( $surface->format(),
+        255, 0, 0 ); # red
+  }
+  SDL::Video::fill_rect
+      ( $surface,
+        $self->get_rect($height, $width),
+        $color );
+}
+</PRE>
+
+<P>See
+the <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">first
+post</A> for more details on the get_rect and draw codes.</P>
+
+<P>Now we need to add our wall to the game, that will mean a simple
+change in our main code, first we need to load the Wall module, then
+initialize the Wall just after initializing the ball, and finally
+calling the draw method just after calling the same method on
+ball.</P>
+
+<PRE>
+use Wall;
+</PRE>
+
+<PRE>
+my $wall = Wall->new;
+</PRE>
+
+<PRE>
+$wall->draw($app, $height, $width);
+</PRE>
+
+<P>If you tried to run the code at this point, you'll notice you won't
+see any wall. That happens because the application is only updating
+the screen where the ball is passing. The Wall needs to be drawn a
+first time, and the screen needs to be updated at that position. This
+prevents us from re-updating the wall rect everytime, which is
+pointless, since the wall is static - that code goes right before the
+main loop.</P>
+
+<PRE>
+# let's draw the wall for the first time.
+$wall->draw($app, $height, $width);
+SDL::Video::update_rects
+  ( $app,
+    $wall->get_rect($height, $width) );
+</PRE>
+
+<P>Now we need to check for a collision. This should happen immediatly
+after the time_lapse call, so we work in the current position. Note
+that while I neglected math in the movement part, here it's more
+complicated because I need to react in a reasonable manner depending
+on how the collision happened. But as we're working in Perl and we
+have CPAN, I can just use Collision::2D (zpmorgan++ for working on
+this and pointing me in the correct direction)</P>
+
+<P>If you don't have the Collision::2D module installed, just call</P>
+
+<PRE>
+# cpan Collision::2D
+</PRE>
+
+<P>If you're not sure wether you have it or not, just try installing
+it anyway, it will suceed if the module is already installed.</P>
+
+<PRE>
+use Collision::2D ':all';
+sub collide {
+    my ($ball, $wall, $time) = @_;
+    my $rect = hash2rect({ x => $wall->pos_h, y => $wall->pos_v,
+                           h => $wall->height, w => $wall->width });
+    my $circ = hash2circle({ x => $ball->cen_h, y => $ball->cen_v,
+                             radius => $ball->radius,
+                             xv => $ball->vel_h,
+                             yv => $ball->vel_v });
+    return dynamic_collision($circ, $rect, interval => $time);
+}
+</PRE>
+
+<P>I assumed an API that wasn't currently implemented in our Ball
+object, so I changed the ball so that pos_v, pos_h, width and height
+return the bounding dimensions for the ball I won't put the code in
+the post, but you can check at
+the <a href="http://github.com/ruoso/games-perl/">github repo</a>.</P>
+
+<P>Okay, now it's time to check for collisions and act
+accordingly. Again, we'll assume an 100% efficient collision, so the
+code looks like:</P>
+
+<PRE>
+  if (my @dir = Util::collide($ball, $wall)) {
+      if (grep {/^horizontal$/} @dir) {
+          $ball->vel_h($ball->vel_h * -1);
+      }
+      if (grep {/^vertical$/} @dir) {
+          $ball->vel_v($ball->vel_v * -1);
+      }
+  }
+</PRE>
