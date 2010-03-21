@@ -118,13 +118,13 @@ SDL::Video::update_rects
     $wall->get_rect($height, $width) );
 </PRE>
 
-<P>Now we need to check for a collision. This should happen immediatly
-after the time_lapse call, so we work in the current position. Note
-that while I neglected math in the movement part, here it's more
-complicated because I need to react in a reasonable manner depending
-on how the collision happened. But as we're working in Perl and we
-have CPAN, I can just use Collision::2D (zpmorgan++ for working on
-this and pointing me in the correct direction)</P>
+<P>Now we need to check for a collision. This should happen in the
+place of the time_lapse call. Note that while I neglected math in the
+movement part, here it's more complicated because I need to react in a
+reasonable manner depending on how the collision happened. But as
+we're working in Perl and we have CPAN, I can just use Collision::2D
+(zpmorgan++ for working on this and pointing me in the correct
+direction)</P>
 
 <P>If you don't have the Collision::2D module installed, just call</P>
 
@@ -160,12 +160,140 @@ accordingly. Again, we'll assume an 100% efficient collision, so the
 code looks like:</P>
 
 <PRE>
-  if (my @dir = Util::collide($ball, $wall)) {
-      if (grep {/^horizontal$/} @dir) {
+  my $frame_elapsed_time = ($now - $oldtime)/1000;
+  if (my $coll = Util::collide($ball, $wall, $frame_elapsed_time)) {
+      # need to place the ball in the result after the bounce given
+      # the time elapsed after the collision.
+      my $collision_remaining_time = $frame_elapsed_time - $coll->time;
+      my $movement_before_collision_h = $ball->vel_h * $coll->time;
+      my $movement_before_collision_v = $ball->vel_v * $coll->time;
+      my $movement_after_collision_h = $ball->vel_h * $collision_remaining_time;
+      my $movement_after_collision_v = $ball->vel_v * $collision_remaining_time;
+      if ($coll->axis eq 'x') {
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($movement_after_collision_h * -1));
+          $ball->cen_v($ball->cen_v +
+                       $movement_before_collision_v +
+                       $movement_after_collision_v);
           $ball->vel_h($ball->vel_h * -1);
-      }
-      if (grep {/^vertical$/} @dir) {
+      } elsif ($coll->axis eq 'y') {
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($movement_after_collision_v * -1));
+          $ball->cen_h($ball->cen_h +
+                       $movement_before_collision_h +
+                       $movement_after_collision_h);
+          $ball->vel_v($ball->vel_v * -1);
+      } elsif (ref $coll->axis eq 'ARRAY') {
+          my ($xv, $yv) = @{$coll->bounce_vector};
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($xv * $collision_remaining_time));
+          $ball->vel_h($xv);
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($yv * $collision_remaining_time));
+          $ball->vel_v($yv);
+      } else {
+          warn 'BAD BALL!';
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($movement_after_collision_h * -1));
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($movement_after_collision_v * -1));
+          $ball->vel_h($ball->vel_h * -1);
           $ball->vel_v($ball->vel_v * -1);
       }
+  } else {
+      $ball->time_lapse($oldtime, $now, $height, $width);
   }
 </PRE>
+
+<P>Okay, the above code was a bit complicated, let's brake it down...
+
+<PRE>
+  my $frame_elapsed_time = ($now - $oldtime)/1000;
+</PRE>
+
+<P>Collision::2D works with time in seconds, it calculates if the two
+objects would have collided during the duration of this frame.</P>
+
+<PRE>
+  if (my $coll = Util::collide($ball, $wall, $frame_elapsed_time)) {
+     ...
+  } else {
+      $ball->time_lapse($oldtime, $now, $height, $width);
+  }
+</PRE>
+
+<P>Now we check if there was a collision. If not, we just proceed to
+the regular code that calculates the new position for the ball.</P>
+
+<PRE>
+      my $collision_remaining_time = $frame_elapsed_time - $coll->time;
+      my $movement_before_collision_h = $ball->vel_h * $coll->time;
+      my $movement_before_collision_v = $ball->vel_v * $coll->time;
+      my $movement_after_collision_h = $ball->vel_h * $collision_remaining_time;
+      my $movement_after_collision_v = $ball->vel_v * $collision_remaining_time;
+</PRE>
+
+<P>In the case we have a collision, Collision::2D tells us when and
+how it happened. In order to implement the bouncing, I also calculate
+how far they would have been proceeded before and after the collision.</P>
+
+
+<PRE>
+      if ($coll->axis eq 'x') {
+          ...
+      } elsif ($coll->axis eq 'y') {
+          ...
+      } elsif (ref $coll->axis eq 'ARRAY') {
+          ...
+      } else {
+          ...
+      }
+</PRE>
+
+<P>The method that describes how the collision happened is "axis". If
+it was a purely horizontal colision, it will return 'x', if it was
+purely vertical, it will return 'y', if it was mixed, it will return a
+vector that describes it. In the case of a bug, it will return undef.</P>
+
+<PRE>
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($movement_after_collision_h * -1));
+          $ball->cen_v($ball->cen_v +
+                       $movement_before_collision_v +
+                       $movement_after_collision_v);
+          $ball->vel_h($ball->vel_h * -1);
+</PRE>
+
+<P>In the case of perfect horizontal or vertical collision (or bug),
+we reposition the ball by first calculating where it would be at the
+time of the collision and then bounce it away - depending on how the
+collision occurred.</P>
+
+<PRE>
+          my ($xv, $yv) = @{$coll->bounce_vector};
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($xv * $collision_remaining_time));
+          $ball->vel_h($xv);
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($yv * $collision_remaining_time));
+          $ball->vel_v($yv);
+</PRE>
+
+<P>This last part of the code uses a cool feature for Collision::2D,
+which returns a bounce information for that collision, which we then
+use to figure out the correct position after the bounce.
+
+<P>And now we can run our code. I have made some other changes not
+explained here, because they are just settings that control the
+behavior. Remember to access
+the <a href="http://github.com/ruoso/games-perl/">github repo</a> for
+more details.</P>
+
+<P>Now a small video of the game running.</P>
+
+<object width="480" height="385"><param name="movie"
+value="http://www.youtube.com/v/PcDe0dKOflA&hl=pt_BR&fs=1&"></param><param name="allowFullScreen"
+value="true"></param><param name="allowscriptaccess"
+value="always"></param><embed src="http://www.youtube.com/v/PcDe0dKOflA&hl=pt_BR&fs=1&"
+type="application/x-shockwave-flash" allowscriptaccess="always"
+allowfullscreen="true" width="480" height="385"></embed></object>

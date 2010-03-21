@@ -89,33 +89,48 @@ while (1) {
 
   my $old_ball_rect = $ball_rect;
 
-  $ball->time_lapse($oldtime, $now, $height, $width);
-
   my $frame_elapsed_time = ($now - $oldtime)/1000;
   if (my $coll = Util::collide($ball, $wall, $frame_elapsed_time)) {
       # need to place the ball in the result after the bounce given
       # the time elapsed after the collision.
       my $collision_remaining_time = $frame_elapsed_time - $coll->time;
+      my $movement_before_collision_h = $ball->vel_h * $coll->time;
+      my $movement_before_collision_v = $ball->vel_v * $coll->time;
       my $movement_after_collision_h = $ball->vel_h * $collision_remaining_time;
       my $movement_after_collision_v = $ball->vel_v * $collision_remaining_time;
       if ($coll->axis eq 'x') {
-          $ball->cen_h($ball->cen_h + ($movement_after_collision_h * -2));
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($movement_after_collision_h * -1));
+          $ball->cen_v($ball->cen_v +
+                       $movement_before_collision_v +
+                       $movement_after_collision_v);
           $ball->vel_h($ball->vel_h * -1);
       } elsif ($coll->axis eq 'y') {
-          $ball->cen_v($ball->cen_v + ($movement_after_collision_v * -2));
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($movement_after_collision_v * -1));
+          $ball->cen_h($ball->cen_h +
+                       $movement_before_collision_h +
+                       $movement_after_collision_h);
           $ball->vel_v($ball->vel_v * -1);
       } elsif (ref $coll->axis eq 'ARRAY') {
           my ($xv, $yv) = @{$coll->bounce_vector};
-          $ball->cen_h($ball->cen_h + ($movement_after_collision_h * -1) +
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
                        ($xv * $collision_remaining_time));
           $ball->vel_h($xv);
-          $ball->cen_v($ball->cen_v + ($movement_after_collision_v * -1) +
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
                        ($yv * $collision_remaining_time));
           $ball->vel_v($yv);
       } else {
           warn 'BAD BALL!';
-          $ball = Ball->new;
+          $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                       ($movement_after_collision_h * -1));
+          $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                       ($movement_after_collision_v * -1));
+          $ball->vel_h($ball->vel_h * -1);
+          $ball->vel_v($ball->vel_v * -1);
       }
+  } else {
+      $ball->time_lapse($oldtime, $now, $height, $width);
   }
 
   $ball_rect = $ball->get_rect($height, $width);
