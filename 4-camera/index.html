@@ -1,0 +1,44 @@
+<P>Following
+posts <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">1</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">2</A> and
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">3</A>
+on the subject of writing games in Perl, now we are going to add
+a camera.</P>
+
+<P>Up to this point, we've been coupling the positional information in
+our simulated universe with the screen position. This is very easy to
+do, but very limiting as well, how can we represent off-screen
+elements that way?</P>
+
+<P>Our next step is to implement a camera. The idea is quite simple,
+instead of asking for each model object to render itself, We're going
+to:</P>
+
+<OL>
+<LI>Initialize a view object for each of the model objects.</LI>
+<LI>Detect which model objects are in the current view sight of the
+camera.</LI>
+<LI>Send to the view objects the positional information of the model
+objects.
+<LI>Ask the view objects to draw themselves.
+</OL>
+
+<P>At this point you might have noticed that I'm using the terms
+"model" and "view" as a direct reference to the Model-View-Controller
+architecture, and that's precisely my intention. The basic idea is:
+The model is only responsible for managing the simulation of our
+universe, while the view is only responsible for turning that
+simulation visible to the user. The Controller here is the code that
+implements the main loop, receiving the user events, and coordinating
+the FPS management.</P>
+
+<P>I could list several reasons on why having the model and the view
+as separated objects is a good idea, but I'd like two point just two
+of them, since these are going to be future topics in this
+tutorial:</P>
+
+<OL>
+<LI>You can apply "themes" to the visualization, like "hi-res" and
+"low-res" simply by changing the initialization of the view, adding
+support for zoom and rotation is also very simple.
+<LI>
