@@ -86,4 +86,15 @@ of what it is representing, as long as it knows how to do it. In our
 case, it doesn't need to know if it is representing a Ball or a Wall,
 it simply needs to know where it is and what color to paint. This is
 also going to be used for the background.</DD>
+<DT>lib/BouncingBall/View/MainSurface.pm</DT>
+<DD>This class represents the main application surface, it is special
+because it needs to configure the video mode, but it is also a
+dependency for the FilledRect view, since it needs to blit itself
+somewhere.</DD>
+<DT>lib/BouncingBall/View/Camera.pm</DT>
+<DD>This is the view class that will implement the mapping of
+coordinates from the simulated universe to the MainSurface, the
+FilledRect also depends on this class.</DD>
+</DL>
+
 
