@@ -41,4 +41,49 @@ tutorial:</P>
 <LI>You can apply "themes" to the visualization, like "hi-res" and
 "low-res" simply by changing the initialization of the view, adding
 support for zoom and rotation is also very simple.
-<LI>
+<LI>You can have the calculations on the simulation side in a
+different thread then the rendering of the objects, enabling our game
+to take advantage on multi-core systems.</LI>
+</OL>
+
+<P>Enough on the introduction, let's start coding.</P>
+
+<P>The first thing I'm going to do is reorganize our current module
+layout. Up to this point our code had:
+
+<UL>
+<LI>ball.pl
+<LI>lib/Ball.pm</LI>
+<LI>lib/Wall.pm</LI>
+<LI>lib/Util.pm</LI>
+</UL>
+
+<P>But now we're going to need a different layout, here is our target
+organization:</P>
+
+<DL>
+<DT>ball.pl</DT>
+<DD>This is still going to be our main script, but we're going to have
+less code in it.</DD>
+<DT>lib/BouncingBall/Model/Ball.pm</DT>
+<DD>Yes, I named our game BouncingBall, and the first model class is
+the ball itself, it will look much like the current code, but the
+"get_rect" and the "draw" methods won't be there.
+<DT>lib/BouncingBall/Model/Wall.pm</DT>
+<DD>This looks like our current Wall code, but as with the ball,
+"get_rect" and "draw" won't be there.</DD>
+<DT>lib/BouncingBall/Controller/InGame.pm</DT>
+<DD>At this point we're only going to have one controller, but the
+general idea is that we're going to have one controller for each of
+the main states of the game, like "MainMenu", "Paused", "InGame",
+"GameOver" etc. The InGame controller will implement the code that is
+currently inside the main loop of ball.pl</DD>
+<DT>lib/BouncingBall/View/FilledRect.pm</DT>
+<DD>Currently, our ball and our wall are just filled rectangles, so
+we're going to preserve that for now. This is interesting to make the
+view vs model point even more clear. The view doesn't need to be aware
+of what it is representing, as long as it knows how to do it. In our
+case, it doesn't need to know if it is representing a Ball or a Wall,
+it simply needs to know where it is and what color to paint. This is
+also going to be used for the background.</DD>
+
