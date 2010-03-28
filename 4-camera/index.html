@@ -46,7 +46,7 @@ different thread then the rendering of the objects, enabling our game
 to take advantage on multi-core systems.</LI>
 </OL>
 
-<P>Enough on the introduction, let's start coding.</P>
+<h3>Code Layout</h3>
 
 <P>The first thing I'm going to do is reorganize our current module
 layout. Up to this point our code had:
@@ -65,6 +65,9 @@ organization:</P>
 <DT>ball.pl</DT>
 <DD>This is still going to be our main script, but we're going to have
 less code in it.</DD>
+<DT>lib/BouncingBall.pm</DT>
+<DD>Main application module, most of the code currently in ball.pl
+goes here.</DD>
 <DT>lib/BouncingBall/Model/Ball.pm</DT>
 <DD>Yes, I named our game BouncingBall, and the first model class is
 the ball itself, it will look much like the current code, but the
@@ -97,4 +100,40 @@ coordinates from the simulated universe to the MainSurface, the
 FilledRect also depends on this class.</DD>
 </DL>
 
+<h3>General flow</h3>
+
+<OL>
+<LI>ball.pl initializes the BouncingBall module.
+<LI>BouncingBall initializes the MainSurface view, as this view is
+special and is preserved during the entire application lifetime,
+independent of the controller in charge right now.</LI>
+<LI>As we don't implement game menu or any other fancy stuff, we go
+directly to the game. That means we'll initialize the InGame
+Controller.</LI>
+<LI>The connection between the views and the models is defined by the
+controller, so it needs to initialize the models, the views and
+connect them together.</LI>
+<LI>After the initialization, we're ready for the game loop, which is,
+at this point, entirely handled by the InGame controller.</LI>
+</OL>
+
+<h3>The case for Observers</h3>
+
+<P>A naive implementation of the connection between the models and the
+views would be, at each step, to fetch the relevant information from
+the model and set it into the view. Or possibly have the view itself
+fetch the data from the model. But there's one important point to
+consider, if the model and the view ends in a different thread,
+accessing each other's data would become significantly complicated.</P>
+
+<P>That being said, a different mechanism for view-model integration
+is necessary. If we go to the way GUI toolkits work, we'll notice a
+pattern called "The Observer Pattern", basically, one object registers
+itself as "observing" the other. When that specific type of event
+happens, a pre-defined method is called in the observing object.</P>
+
+<P>So what we're going to do is to preserve a local cache of the
+information that view needs from the model, use it directly and get it
+updated using the observer pattern. That way we have the model and the
+view decoupled in terms of threading.</P>
 
