@@ -57,56 +57,6 @@ sub time_lapse {
     $self->cen_h($width - ($self->cen_h - $width));
     $self->vel_h($self->vel_h * -1);
   }
-
-
-}
-
-sub get_rect {
-  my ($self, $height, $width) = @_;
-
-  my $inverted_v = $height - $self->cen_v;
-
-  my $x = Util::m2px( $self->cen_h - $self->radius );
-  my $y = Util::m2px( $inverted_v - $self->radius );
-  my $h = Util::m2px( $self->radius * 2 );
-  my $w = Util::m2px( $self->radius * 2 );
-
-  my $screen_w = Util::m2px( $width );
-  my $screen_h = Util::m2px( $height );
-
-  if ($x < 0) {
-    $w += $x;
-    $x = 0;
-  }
-
-  if ($x + $w > $screen_w) {
-    $w -= ($x + $w) - $screen_w;
-  }
-
-  if ($y < 0) {
-    $h += $y;
-    $h = 0;
-  }
-
-  if ($y + $h > $screen_h) {
-    $h -= ($y + $h) - $screen_h;
-  }
-
-  return SDL::Rect->new( $x, $y, $w, $h );
-}
-
-my $color;
-sub draw {
-  my ($self, $surface, $height, $width) = @_;
-  unless ($color) {
-    $color = SDL::Video::map_RGB
-      ( $surface->format(),
-        0, 0, 255 ); # blue
-  }
-  SDL::Video::fill_rect
-      ( $surface,
-        $self->get_rect($height, $width),
-        $color );
 }
 
 1;

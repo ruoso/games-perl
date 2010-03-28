@@ -137,3 +137,54 @@ information that view needs from the model, use it directly and get it
 updated using the observer pattern. That way we have the model and the
 view decoupled in terms of threading.</P>
 
+<h3>To the code</h3>
+
+<P>The first thing we need to do is porting our Ball and Wall into
+proper model objects, at first, simply removing the "get_rect" and
+"draw" methods. I'm not going to put all its code again here, but
+renaming the modules and removing that methods is the only thing I'm
+doing right now.</P>
+
+<P>Now we need to step-by-step get to the final code layout presented
+earlier, let's start by the view classes, and in that case, let's get
+the most important view class, the MainSurface.</P>
+
+<PRE>
+package BouncingBall::View::MainSurface;
+use Moose;
+use SDL ':all';
+use SDL::Video ':all';
+
+has 'surface' => (is => 'rw');
+has 'width' => (is => 'ro', default => 800);
+has 'height' => (is => 'ro', default => 600);
+has 'depth' => (is => 'ro', default => 32);
+
+sub BUILD {
+    my ($self) = @_;
+
+    die 'Cannot init ' . SDL::get_error()
+      if ( SDL::init( SDL_INIT_VIDEO ) == -1 );
+
+    $self->surface
+      ( SDL::Video::set_video_mode
+        ( $self->width, $self->height, $self->depth,
+          SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWACCEL ))
+        or die 'Error initializing video.';
+}
+</PRE>
+
+<P>Here we use Moose object initialization to initialize the SDL Video
+subsystem and get a new surface for the required videomode. This is a
+bit different then what we were doing in the original ball.pl, but not
+much. The most important difference is that we're now using double
+hardware buffering, which is more efficient then doing individual
+updates.</P>
+
+<P>Now we need the Camera view, which is going to implement the logic
+on translating the coordinates from each object to the current
+visualization. This is a very important decoupling in our logic,
+because it is here that we relativize the points from the simulated
+universe to the screen. And this is going to be done by setting a
+camera position which is going to serve as pivot in the coordinate
+translation.</P>
