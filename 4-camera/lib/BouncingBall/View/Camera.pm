@@ -2,19 +2,14 @@ package BouncingBall::View::Camera;
 use Moose;
 
 has pointing_x => ( is => 'rw',
-                    isa => 'Int',
                     default => 0 );
 has pointing_y => ( is => 'rw',
-                    isa => 'Int',
                     default => 0 );
 has dpi        => ( is => 'rw',
-                    isa => 'Int',
                     default => 0.96 );
 has pixels_w   => ( is => 'ro',
-                    isa => 'Int',
                     required => 1 );
 has pixels_h   => ( is => 'ro',
-                    isa => 'Int',
                     required => 1 );
 
 sub m2px {
