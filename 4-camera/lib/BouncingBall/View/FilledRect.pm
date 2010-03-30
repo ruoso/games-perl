@@ -3,6 +3,7 @@ use Moose;
 use SDL::Video ':all';
 use SDL::Surface;
 
+with 'BouncingBall::View';
 with 'BouncingBall::Event::RectMovingObserver';
 
 has x         => ( is => 'rw',
@@ -100,7 +101,7 @@ sub draw {
 
 sub rect_moved {
     my ($self, $ev) = @_;
-    $self->$_($ev->$_) for qw(x y w h);
+    $self->$_($ev->new_rect->$_) for qw(x y w h);
 }
 
 1;

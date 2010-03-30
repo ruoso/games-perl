@@ -1,4 +1,4 @@
-package Wall;
+package BouncingBall::Model::Wall;
 use Moose;
 use Util;
 use SDL::Rect;

@@ -22,7 +22,7 @@ sub remove_rect_moving_listener {
         }
     }
     if ($found) {
-        $self->rect_moving_listeners->splice($found, 1, ());
+        splice @{$self->rect_moving_listeners}, $found, 1, ();
     }
 }
 
@@ -30,7 +30,7 @@ sub fire_rect_moved {
     my ($self, $old_rect, $new_rect) = @_;
     my $ev = RectMoved->new({ old_rect => $old_rect,
                               new_rect => $new_rect });
-    $self->rect_moving_listeners->map({ $_->rect_moved($ev) });
+    $_->rect_moved($ev) for @{$self->rect_moving_listeners};
 }
 
 1;

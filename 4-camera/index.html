@@ -81,14 +81,15 @@ general idea is that we're going to have one controller for each of
 the main states of the game, like "MainMenu", "Paused", "InGame",
 "GameOver" etc. The InGame controller will implement the code that is
 currently inside the main loop of ball.pl</DD>
+<DT>lib/BouncingBall/View/Plane.pm</DT>
+<DD>This implements the background.</DD>
 <DT>lib/BouncingBall/View/FilledRect.pm</DT>
 <DD>Currently, our ball and our wall are just filled rectangles, so
 we're going to preserve that for now. This is interesting to make the
 view vs model point even more clear. The view doesn't need to be aware
 of what it is representing, as long as it knows how to do it. In our
 case, it doesn't need to know if it is representing a Ball or a Wall,
-it simply needs to know where it is and what color to paint. This is
-also going to be used for the background.</DD>
+it simply needs to know where it is and what color to paint.</DD>
 <DT>lib/BouncingBall/View/MainSurface.pm</DT>
 <DD>This class represents the main application surface, it is special
 because it needs to configure the video mode, but it is also a
@@ -107,6 +108,8 @@ integer), to be used by RectMoved.</DD>
 <DT>lib/BouncingBall/Event/MovingRectObservable.pm</DT>
 <DD>Moose role that implements the logic for being a class that can be
 observed.</DD>
+<DT>lib/BouncingBall/Event/MovingRectObserver.pm</DT>
+<DD>Moose role that defines the type of the observer class.</DD>
 </DL>
 
 <h3>General flow</h3>
@@ -190,6 +193,84 @@ much. The most important difference is that we're now using double
 hardware buffering, which is more efficient then doing individual
 updates.</P>
 
+<P>Now we need the Plane view, which implements the background.</P>
+
+<PRE>
+package BouncingBall::View::Plane;
+use Moose;
+use SDL::Video ':all';
+use SDL::Surface;
+
+has color     => ( is => 'rw',
+                   default => 0 );
+has surface   => ( is => 'rw' );
+has color_obj => ( is => 'rw' );
+has main      => ( is => 'ro',
+                   required => 1 );
+
+sub BUILD {
+    my ($self) = @_;
+    $self->_init_surface;
+    $self->_init_color_object;
+    $self->_init_rect;
+    $self->_fill_rect;
+}
+
+sub _init_surface {
+    my ($self) = @_;
+    $self->surface
+      ( SDL::Surface->new
+        ( SDL_SWSURFACE,
+          $self->main->width,
+          $self->main->height,
+          $self->main->depth,
+          0, 0, 0, 255 ) );
+}
+
+sub _init_color_object {
+    my ($self) = @_;
+    $self->color_obj
+      ( SDL::Video::map_RGB
+        ( $self->main->surface->format,
+          0xFF0000 & $self->color,
+          0x00FF00 & $self->color,
+          0x0000FF & $self->color ));
+}
+
+sub _init_rect {
+    my ($self) = @_;
+    $self->rect_obj
+      ( SDL::Rect->new
+        ( 0, 0,
+          $self->main->width,
+          $self->main->height ) );
+}
+
+sub _fill_rect {
+    my ($self) = @_;
+    SDL::Video::fill_rect
+        ( $self->surface,
+          $self->rect_obj,
+          $self->color_obj );
+}
+
+after 'color' => sub {
+    my ($self, $color) = @_;
+    if ($color) {
+        $self->_init_color_object;
+        $self->_fill_rect;
+    }
+    return $color;
+};
+
+sub draw {
+    my ($self) = @_;
+    SDL::Video::blit_surface
+        ( $self->surface, $self->rect_obj,
+          $self->main->surface, $self->rect_obj );
+}
+</PRE>
+
 <P>Now we need the Camera view, which is going to implement the logic
 on translating the coordinates from each object to the current
 visualization. This is a very important decoupling in our logic,
@@ -269,7 +350,6 @@ sub is_visible {
 
 <P>The Camera requires the information from the MainSurface on the
 ammount of pixels it has to be able to do the translations.</P>
-
 
 <P>Now we need to implement the FilledRect view class.</P>
 
@@ -488,10 +568,10 @@ after qw(cen_v cen_h) => sub {
     my ($self, $newval) = @_;
     if ($newval) {
         $self->fire_rect_moved( undef,
-                                RectMoved->new({ x => $self->pos_h,
-                                                 y => $self->pos_v,
-                                                 w => $self->width,
-                                                 h => $self->height }) );
+                                Rect->new({ x => $self->pos_h,
+                                            y => $self->pos_v,
+                                            w => $self->width,
+                                            h => $self->height }) );
     }
 }
 </PRE>
@@ -506,3 +586,14 @@ sub rect_moved {
     $self->$_($ev->$_()) for grep { $self->$_() != $ev->$_() } qw(x y w h);
 }
 </PRE>
+
+<H3>Everything's set! To the controller!</H3>
+
+<P>Now we finally can have the controller code written. It should:</P>
+
+<OL>
+<LI>Initialize the models</LI>
+<LI>Initialize the views</LI>
+<LI>Connect them together</LI>
+<LI>Orchestrate the time_lapse and the general rendering</LI>
+</OL>

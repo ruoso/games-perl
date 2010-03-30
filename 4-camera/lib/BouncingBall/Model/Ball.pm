@@ -1,4 +1,4 @@
-package Ball;
+package BouncingBall::Model::Ball;
 use Moose;
 
 use constant g => 9.8;
@@ -31,7 +31,7 @@ sub width { $_[0]->radius * 2 };
 sub height { $_[0]->radius * 2 };
 
 sub time_lapse {
-  my ($self, $old_time, $new_time, $height, $width) = @_;
+  my ($self, $old_time, $new_time) = @_;
   my $elapsed = ($new_time - $old_time)/1000; # convert to seconds...
 
   # now simple mechanics...
@@ -42,24 +42,6 @@ sub time_lapse {
   # finally get the new position
   $self->cen_v( $self->cen_v + $self->vel_v * $elapsed );
   $self->cen_h( $self->cen_h + $self->vel_h * $elapsed );
-
-  # this ball is supposed to bounce, so let's check $width and $height
-  # if we're out of bounds, we assume a 100% efficient bounce.
-  if ($self->cen_v < 0) {
-    $self->cen_v($self->cen_v * -1);
-    $self->vel_v($self->vel_v * -1);
-  } elsif ($self->cen_v > $height) {
-    $self->cen_v($height - ($self->cen_v - $height));
-    $self->vel_v($self->vel_v * -1);
-  }
-
-  if ($self->cen_h < 0) {
-    $self->cen_h($self->cen_h * -1);
-    $self->vel_h($self->vel_h * -1);
-  } elsif ($self->cen_h > $width) {
-    $self->cen_h($width - ($self->cen_h - $width));
-    $self->vel_h($self->vel_h * -1);
-  }
 }
 
 after qw(cen_v cen_h) => sub {
@@ -71,6 +53,6 @@ after qw(cen_v cen_h) => sub {
                                             w => $self->width,
                                             h => $self->height }) );
     }
-}
+};
 
 1;
