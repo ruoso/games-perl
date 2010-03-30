@@ -98,6 +98,15 @@ somewhere.</DD>
 <DD>This is the view class that will implement the mapping of
 coordinates from the simulated universe to the MainSurface, the
 FilledRect also depends on this class.</DD>
+<DT>lib/BouncingBall/Event/RectMoved.pm</DT>
+<DD>Typed event that describes the movement of some object represented
+by its enclosing rect.</DD>
+<DT>lib/BouncingBall/Event/Rect.pm</DT>
+<DD>Object describing a simple rect (using floating-point instead of
+integer), to be used by RectMoved.</DD>
+<DT>lib/BouncingBall/Event/MovingRectObservable.pm</DT>
+<DD>Moose role that implements the logic for being a class that can be
+observed.</DD>
 </DL>
 
 <h3>General flow</h3>
@@ -364,7 +373,60 @@ sub draw {
 }
 </PRE>
 
-
 <P>Ok, now that we have the Model and the View classes, we can
 implement the observer pattern, so the view can be updated as the
-model changes.
+model changes.</P>
+
+<P>One important aspect on how the MVC model works is that the
+controller should have just a limited control on the interaction
+between the model and the view, otherwise you'll get a very
+complicated code in the controller. Ideally you should have the same
+level of abstraction in the model as you have in the view, so you have
+componentization of your application.</P>
+
+<P>That being said, we need to plan the communication pattern between
+the view and the model. It is important that they should be mostly
+unaware of each other, in the sense that the view doesn't need to know
+that it's a ball being modelled, but just that it has a point
+describing its position and a rect describing its measures - We can
+even keep only the rect for our current purposes.</P>
+
+<P>That is our RectMoved event class and the Rect class which is used
+by it:</P>
+
+<PRE>
+package BouncingBall::Event::RectMoved;
+use Moose;
+
+has old_rect => ( is => 'ro',
+                  isa => 'BouncingBall::Event::Rect',
+                  required => 1 );
+has new_rect => ( is => 'ro',
+                  isa => 'BouncingBall::Event::Rect',
+                  required => 1 );
+
+</PRE>
+
+<PRE>
+package BouncingBall::Event::Rect;
+use Moose;
+
+has x => ( is => 'ro',
+           isa => 'Numeric',
+           required => 1 );
+has y => ( is => 'ro',
+           isa => 'Numeric',
+           required => 1 );
+has w => ( is => 'ro',
+           isa => 'Numeric',
+           required => 1 );
+has h => ( is => 'ro',
+           isa => 'Numeric',
+           required => 1 );
+</PRE>
+
+<P>Now we need the role that implements the observable part, meaning
+that any class that wants to fire events for moving rects just need to
+compose that role and call the fire_rect_moved method.</P>
+
+
