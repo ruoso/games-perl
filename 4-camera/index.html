@@ -400,7 +400,7 @@ use Moose;
 
 has old_rect => ( is => 'ro',
                   isa => 'BouncingBall::Event::Rect',
-                  required => 1 );
+                  required => 0 );
 has new_rect => ( is => 'ro',
                   isa => 'BouncingBall::Event::Rect',
                   required => 1 );
@@ -429,4 +429,80 @@ has h => ( is => 'ro',
 that any class that wants to fire events for moving rects just need to
 compose that role and call the fire_rect_moved method.</P>
 
+<PRE>
+package BouncingBall::Event::RectMovingObservable;
+use Moose::Role;
+use MooseX::Types::Moose qw(ArrayRef);
 
+use aliased 'BouncingBall::Event::RectMovingObserver';
+use aliased 'BouncingBall::Event::RectMoved';
+
+has 'rect_moving_listeners' => ( traits => ['Array'],
+                                 is => 'ro',
+                                 isa => ArrayRef[RectMovingObserver],
+                                 default => sub { [] },
+                                 handles => { add_rect_moving_listener => 'push' } );
+
+sub remove_rect_moving_listener {
+    my ($self, $object) = @_;
+    my $count = $self->rect_moving_listeners->count;
+    my $found;
+    for my $i (0..($count-1)) {
+        if ($self->rect_moving_listeners->[$i] == $object) {
+            $found = $i;
+            last;
+        }
+    }
+    if ($found) {
+        $self->rect_moving_listeners->splice($found, 1, ());
+    }
+}
+
+sub fire_rect_moved {
+    my ($self, $old_rect, $new_rect) = @_;
+    my $ev = RectMoved->new({ old_rect => $old_rect,
+                              new_rect => $new_rect });
+    $self->rect_moving_listeners->map({ $_->rect_moved($ev) });
+}
+</PRE>
+
+<P>And the RectMovingObserver role:</P>
+
+<PRE>
+package BouncingBall::Event::RectMovingObserver;
+use Moose::Role;
+
+requires 'rect_moved';
+</PRE>
+
+<P>Now we need to make our Ball model class fire that event whenever
+its position or size attributes are changed. So we're goint to add the
+following modifiers to the attributes. At first we're not going to
+support the old_rect attribute of the event, so we're just sending the
+new_rect.</P>
+
+<PRE>
+with 'BouncingBall::Event::RectMovingObservable';
+
+after qw(cen_v cen_h) => sub {
+    my ($self, $newval) = @_;
+    if ($newval) {
+        $self->fire_rect_moved( undef,
+                                RectMoved->new({ x => $self->pos_h,
+                                                 y => $self->pos_v,
+                                                 w => $self->width,
+                                                 h => $self->height }) );
+    }
+}
+</PRE>
+
+<P>And finally adding the observer code in the view class.</P>
+
+<PRE>
+with 'BouncingBall::Event::RectMovingObserver';
+
+sub rect_moved {
+    my ($self, $ev) = @_;
+    $self->$_($ev->$_()) for grep { $self->$_() != $ev->$_() } qw(x y w h);
+}
+</PRE>

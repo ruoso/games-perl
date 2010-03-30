@@ -3,7 +3,7 @@ use Moose;
 
 has old_rect => ( is => 'ro',
                   isa => 'BouncingBall::Event::Rect',
-                  required => 1 );
+                  required => 0 );
 has new_rect => ( is => 'ro',
                   isa => 'BouncingBall::Event::Rect',
                   required => 1 );

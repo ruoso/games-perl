@@ -2,8 +2,11 @@ package Ball;
 use Moose;
 
 use constant g => 9.8;
+use aliased 'BouncingBall::Event::Rect';
 use Util;
 use SDL::Rect;
+
+with 'BouncingBall::Event::RectMovingObservable';
 
 # how much space does it take
 has radius => (is => 'rw', isa => 'Num', default => 0.5);
@@ -57,6 +60,17 @@ sub time_lapse {
     $self->cen_h($width - ($self->cen_h - $width));
     $self->vel_h($self->vel_h * -1);
   }
+}
+
+after qw(cen_v cen_h) => sub {
+    my ($self, $newval) = @_;
+    if ($newval) {
+        $self->fire_rect_moved( undef,
+                                Rect->new({ x => $self->pos_h,
+                                            y => $self->pos_v,
+                                            w => $self->width,
+                                            h => $self->height }) );
+    }
 }
 
 1;
