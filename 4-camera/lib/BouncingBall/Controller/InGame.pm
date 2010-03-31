@@ -38,7 +38,9 @@ sub BUILD {
                                   color => 0xFFFFFF });
 
     my $camera = Camera->new({ pixels_w => $self->main_surface->width,
-                               pixels_h => $self->main_surface->height });
+                               pixels_h => $self->main_surface->height,
+                               pointing_x => $self->ball->cen_h,
+                               pointing_y => $self->ball->cen_v });
     $self->ball->add_rect_moving_listener($camera);
 
     my $ball_view = FilledRect->new({ color => 0x0000FF,
@@ -57,23 +59,23 @@ sub BUILD {
 
     # now we need to build four walls, to enclose our ball.
     foreach my $rect ( Rect->new({ x => 0,
-                                   y => 20,
+                                   y => 0,
                                    w => 20,
                                    h => 1 }),
                        Rect->new({ x => 0,
-                                   y => 20,
+                                   y => 0,
                                    h => 20,
                                    w => 1 }),
                        Rect->new({ x => 20,
-                                   y => 20,
+                                   y => 0,
                                    h => 20,
                                    w => 1 }),
                        Rect->new({ x => 0,
-                                   y => 0,
+                                   y => 20,
                                    w => 21,
                                    h => 1 }),
                        Rect->new({ x => 10,
-                                   y => 10,
+                                   y => 0,
                                    h => 10,
                                    w => 1 })) {
 

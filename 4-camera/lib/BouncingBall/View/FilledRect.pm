@@ -97,8 +97,8 @@ after qw(w h) => sub {
 sub draw {
     my ($self) = @_;
     my $rect = SDL::Rect->new
-      ( $self->camera->translate( $self->x, $self->y ),
-        $self->rect_obj->w, $self->rect_obj->h );
+      ( $self->camera->translate_rect( $self->x, $self->y,
+                                       $self->w, $self->h ) );
 
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
