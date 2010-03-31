@@ -356,8 +356,8 @@ sub is_visible {
     my ($self, $x, $y) = @_;
     my ($tx, $ty) = $self->translate($x, $y);
     if ($tx > 0 && $ty > 0 &&
-        $tx < $self->pixels_w &&
-        $ty < $self->pixels_h) {
+        $tx &lt; $self->pixels_w &&
+        $ty &lt; $self->pixels_h) {
         return 1;
     } else {
         return 0;
@@ -957,13 +957,13 @@ sub rect_moved {
     my $dw_y = $self->pointing_y - ($self->height / 2);
     my $br_dw_y = $dw_y + $self->height * 0.2;
 
-    if ($ev->new_rect->x < $br_lf_x) {
+    if ($ev->new_rect->x &lt; $br_lf_x) {
         $self->pointing_x( $self->pointing_x - ($br_lf_x - $ev->new_rect->x))
     } elsif ($ev->new_rect->x > $br_rt_x) {
         $self->pointing_x( $self->pointing_x + ($ev->new_rect->x - $br_rt_x));
     }
 
-    if ($ev->new_rect->y < $br_dw_y) {
+    if ($ev->new_rect->y &lt; $br_dw_y) {
         $self->pointing_y( $self->pointing_y - ($br_dw_y - $ev->new_rect->y))
     } elsif ($ev->new_rect->y > $br_up_y) {
         $self->pointing_y( $self->pointing_y + ($ev->new_rect->y - $br_up_y));
