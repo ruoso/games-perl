@@ -1,12 +1,14 @@
 package BouncingBall::View::Camera;
 use Moose;
 
+with 'BouncingBall::Event::RectMovingObserver';
+
 has pointing_x => ( is => 'rw',
                     default => 0 );
 has pointing_y => ( is => 'rw',
                     default => 0 );
 has dpi        => ( is => 'rw',
-                    default => 0.96 );
+                    default => 0.40 );
 has pixels_w   => ( is => 'ro',
                     required => 1 );
 has pixels_h   => ( is => 'ro',
@@ -58,6 +60,12 @@ sub is_visible {
     } else {
         return 0;
     }
+}
+
+sub rect_moved {
+    my ($self, $ev) = @_;
+    $self->pointing_x($ev->new_rect->x);
+    $self->pointing_y($ev->new_rect->y);
 }
 
 1;

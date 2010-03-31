@@ -48,8 +48,8 @@ sub _init_color_object {
     $self->color_obj
       ( SDL::Video::map_RGB
         ( $self->main->surface->format,
-          0xFF0000 & $self->color,
-          0x00FF00 & $self->color,
+          ((0xFF0000 & $self->color)>>16),
+          ((0x00FF00 & $self->color)>>8),
           0x0000FF & $self->color ));
 }
 
@@ -91,12 +91,13 @@ after qw(w h) => sub {
 
 sub draw {
     my ($self) = @_;
+    my $rect = SDL::Rect->new
+      ( $self->camera->translate( $self->x, $self->y ),
+        $self->rect_obj->w, $self->rect_obj->h );
+
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
-          $self->main->surface,
-          SDL::Rect->new
-          ( $self->camera->translate( $self->x, $self->y ),
-            $self->rect_obj->w, $self->rect_obj->h ) );
+          $self->main->surface, $rect );
 }
 
 sub rect_moved {

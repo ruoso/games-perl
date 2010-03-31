@@ -38,6 +38,7 @@ sub BUILD {
 
     my $camera = Camera->new({ pixels_w => $self->main_surface->width,
                                pixels_h => $self->main_surface->height });
+    $self->ball->add_rect_moving_listener($camera);
 
     my $ball_view = FilledRect->new({ color => 0x0000FF,
                                       camera => $camera,
@@ -54,22 +55,26 @@ sub BUILD {
     $self->walls([]);
 
     # now we need to build four walls, to enclose our ball.
-    foreach my $rect ( Rect->new({ x => -0.5,
-                                   y => -50,
-                                   w => 100,
-                                   h => 0.5 }),
+    foreach my $rect ( Rect->new({ x => 0,
+                                   y => 20,
+                                   w => 20,
+                                   h => 1 }),
+                       Rect->new({ x => 0,
+                                   y => 20,
+                                   h => 20,
+                                   w => 1 }),
+                       Rect->new({ x => 20,
+                                   y => 20,
+                                   h => 20,
+                                   w => 1 }),
                        Rect->new({ x => 0,
                                    y => 0,
-                                   h => 40,
-                                   w => 0.5 }),
-                       Rect->new({ x => 15,
-                                   y => 0,
-                                   h => 40,
-                                   w => 0.5 }),
-                       Rect->new({ x => 0,
-                                   y => 40,
-                                   w => 40,
-                                   h => 0.5 })) {
+                                   w => 21,
+                                   h => 1 }),
+                       Rect->new({ x => 10,
+                                   y => 10,
+                                   h => 10,
+                                   w => 1 })) {
 
         my $wall_model = Wall->new({ pos_v => $rect->y,
                                      pos_h => $rect->x,
@@ -189,6 +194,7 @@ sub handle_frame {
         $ball->time_lapse($old_time, $now);
     }
 
+    warn join ', ', $ball->cen_v, $ball->vel_v;
 
     $_->draw for @{$self->views};
     SDL::Video::flip($self->main_surface->surface);
