@@ -5,11 +5,8 @@ use strict;
 use warnings;
 
 use SDL;
-use SDL::Video;
-use SDL::App;
-use SDL::Events;
 use SDL::Event;
-use SDL::Time;
+use SDL::Events;
 
 use lib 'lib';
 
@@ -45,7 +42,5 @@ while (1) {
     $controller->handle_frame($time, $now);
 
     $time = SDL::get_ticks;
-    #if (($time - $oldtime) < (1000/$fps)) {
-        SDL::delay((1000/$fps));# - ($time - $oldtime));
-    #}
+    SDL::delay(1000/$fps);
 }
