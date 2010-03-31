@@ -66,6 +66,7 @@ sub rect_moved {
     my ($self, $ev) = @_;
     $self->pointing_x($ev->new_rect->x);
     $self->pointing_y($ev->new_rect->y);
+    return 1;
 }
 
 1;

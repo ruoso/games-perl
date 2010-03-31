@@ -34,7 +34,8 @@ has 'views' => ( traits => ['Array'],
 sub BUILD {
     my $self = shift;
 
-    my $background = Plane->new({ main => $self->main_surface });
+    my $background = Plane->new({ main => $self->main_surface,
+                                  color => 0xFFFFFF });
 
     my $camera = Camera->new({ pixels_w => $self->main_surface->width,
                                pixels_h => $self->main_surface->height });
@@ -196,7 +197,10 @@ sub handle_frame {
         $ball->time_lapse($oldtime, $now);
     }
 
-    $_->draw for @{$self->views};
+    foreach my $view (@{$self->views}) {
+        my $ret = $view->draw();
+    }
+
     SDL::Video::flip($self->main_surface->surface);
 
 }

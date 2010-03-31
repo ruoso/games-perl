@@ -69,9 +69,9 @@ sub _init_rect {
 sub _fill_rect {
     my ($self) = @_;
     SDL::Video::fill_rect
-        ( $self->surface,
-          $self->rect_obj,
-          $self->color_obj );
+        ( $self->surface(),
+          $self->rect_obj(),
+          $self->color_obj() );
     return 1;
 }
 
@@ -109,7 +109,8 @@ sub draw {
 
 sub rect_moved {
     my ($self, $ev) = @_;
-    $self->$_($ev->new_rect->$_) for qw(x y w h);
+    $self->$_($ev->new_rect->$_) for
+      grep { $self->$_() != $ev->new_rect->$_() } qw(x y w h);
     return 1;
 }
 

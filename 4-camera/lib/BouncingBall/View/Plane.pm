@@ -18,6 +18,7 @@ sub BUILD {
     $self->_init_color_object;
     $self->_init_rect;
     $self->_fill_rect;
+    return 1;
 }
 
 sub _init_surface {
@@ -29,6 +30,7 @@ sub _init_surface {
           $self->main->height,
           $self->main->depth,
           0, 0, 0, 255 ) );
+    return 1;
 }
 
 sub _init_color_object {
@@ -39,6 +41,7 @@ sub _init_color_object {
           ((0xFF0000 & $self->color)>>16),
           ((0x00FF00 & $self->color)>>8),
           0x0000FF & $self->color ));
+    return 1;
 }
 
 sub _init_rect {
@@ -48,6 +51,7 @@ sub _init_rect {
         ( 0, 0,
           $self->main->width,
           $self->main->height ) );
+    return 1;
 }
 
 sub _fill_rect {
@@ -56,6 +60,7 @@ sub _fill_rect {
         ( $self->surface,
           $self->rect_obj,
           $self->color_obj );
+    return 1;
 }
 
 after 'color' => sub {
@@ -64,7 +69,7 @@ after 'color' => sub {
         $self->_init_color_object;
         $self->_fill_rect;
     }
-    return $color;
+    return 1;
 };
 
 sub draw {
@@ -72,6 +77,7 @@ sub draw {
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
           $self->main->surface, $self->rect_obj );
+    return 1;
 }
 
 
