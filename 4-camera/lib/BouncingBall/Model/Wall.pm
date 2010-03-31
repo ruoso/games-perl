@@ -1,7 +1,5 @@
 package BouncingBall::Model::Wall;
 use Moose;
-use Util;
-use SDL::Rect;
 
 # Position - vertical and horizontal
 has pos_v => (is => 'rw', isa => 'Num', default => 0);

@@ -152,7 +152,7 @@ sub handle_frame {
     my $ball = $self->ball;
     my $collided = 0;
     foreach my $wall (@{$self->walls}) {
-        if (my $coll = Util::collide($ball, $wall, $frame_elapsed_time)) {
+        if (my $coll = collide($ball, $wall, $frame_elapsed_time)) {
             # need to place the ball in the result after the bounce given
             # the time elapsed after the collision.
             my $collision_remaining_time = $frame_elapsed_time - $coll->time;
@@ -206,5 +206,18 @@ sub handle_frame {
     SDL::Video::flip($self->main_surface->surface);
 
 }
+
+use Collision::2D ':all';
+sub collide {
+    my ($ball, $wall, $time) = @_;
+    my $rect = hash2rect({ x => $wall->pos_h, y => $wall->pos_v,
+                           h => $wall->height, w => $wall->width });
+    my $circ = hash2circle({ x => $ball->cen_h, y => $ball->cen_v,
+                             radius => $ball->radius,
+                             xv => $ball->vel_h,
+                             yv => $ball->vel_v });
+    return dynamic_collision($circ, $rect, interval => $time);
+}
+
 
 1;

@@ -3,8 +3,6 @@ use Moose;
 
 use constant g => 9.8;
 use aliased 'BouncingBall::Event::Rect';
-use Util;
-use SDL::Rect;
 
 with 'BouncingBall::Event::RectMovingObservable';
 
