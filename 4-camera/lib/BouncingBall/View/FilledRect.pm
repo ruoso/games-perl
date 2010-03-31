@@ -30,6 +30,7 @@ sub BUILD {
     $self->_init_color_object;
     $self->_init_rect;
     $self->_fill_rect;
+    return 1;
 }
 
 sub _init_surface {
@@ -41,6 +42,7 @@ sub _init_surface {
           $self->camera->m2px($self->h),
           $self->main->depth,
           0, 0, 0, 255 ) );
+    return 1;
 }
 
 sub _init_color_object {
@@ -51,6 +53,7 @@ sub _init_color_object {
           ((0xFF0000 & $self->color)>>16),
           ((0x00FF00 & $self->color)>>8),
           0x0000FF & $self->color ));
+    return 1;
 }
 
 sub _init_rect {
@@ -60,6 +63,7 @@ sub _init_rect {
         ( 0, 0,
           $self->camera->m2px($self->w),
           $self->camera->m2px($self->h) ) );
+    return 1;
 }
 
 sub _fill_rect {
@@ -68,6 +72,7 @@ sub _fill_rect {
         ( $self->surface,
           $self->rect_obj,
           $self->color_obj );
+    return 1;
 }
 
 after 'color' => sub {
@@ -76,7 +81,7 @@ after 'color' => sub {
         $self->_init_color_object;
         $self->_fill_rect;
     }
-    return $color;
+    return 1;
 };
 
 after qw(w h) => sub {
@@ -86,7 +91,7 @@ after qw(w h) => sub {
         $self->_init_rect;
         $self->_fill_rect;
     }
-    return $newval;
+    return 1;
 };
 
 sub draw {
@@ -98,11 +103,14 @@ sub draw {
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
           $self->main->surface, $rect );
+
+    return 1;
 }
 
 sub rect_moved {
     my ($self, $ev) = @_;
     $self->$_($ev->new_rect->$_) for qw(x y w h);
+    return 1;
 }
 
 1;

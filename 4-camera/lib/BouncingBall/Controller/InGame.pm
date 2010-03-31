@@ -142,7 +142,9 @@ sub handle_sdl_event {
 }
 
 sub handle_frame {
-    my ($self, $old_time, $time, $frame_elapsed_time, $now) = @_;
+    my ($self, $oldtime, $now) = @_;
+
+    my $frame_elapsed_time = ($now - $oldtime)/1000;
 
     my $ball = $self->ball;
     my $collided = 0;
@@ -191,10 +193,8 @@ sub handle_frame {
     }
 
     if (!$collided) {
-        $ball->time_lapse($old_time, $now);
+        $ball->time_lapse($oldtime, $now);
     }
-
-    warn join ', ', $ball->cen_v, $ball->vel_v;
 
     $_->draw for @{$self->views};
     SDL::Video::flip($self->main_surface->surface);

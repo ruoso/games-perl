@@ -19,6 +19,8 @@ sub BUILD {
         ( $self->width, $self->height, $self->depth,
           SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWACCEL ))
         or die 'Error initializing video.';
+
+    return 1;
 }
 
 1;

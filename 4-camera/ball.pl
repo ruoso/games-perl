@@ -16,6 +16,8 @@ use lib 'lib';
 use aliased 'BouncingBall::Controller::InGame';
 use aliased 'BouncingBall::View::MainSurface';
 
+SDL::init( SDL_INIT_EVERYTHING );
+
 my $fps = 60;
 
 my $surf = MainSurface->new();
@@ -40,11 +42,10 @@ while (1) {
         }
     }
 
-    my $frame_elapsed_time = ($now - $oldtime)/1000;
-    $controller->handle_frame($oldtime, $time, $frame_elapsed_time, $now);
+    $controller->handle_frame($time, $now);
 
     $time = SDL::get_ticks;
-    if (($time - $oldtime) < (1000/$fps)) {
-        SDL::delay((1000/$fps) - ($time - $oldtime));
-    }
+    #if (($time - $oldtime) < (1000/$fps)) {
+        SDL::delay((1000/$fps));# - ($time - $oldtime));
+    #}
 }
