@@ -65,9 +65,6 @@ organization:</P>
 <DT>ball.pl</DT>
 <DD>This is still going to be our main script, but we're going to have
 less code in it.</DD>
-<DT>lib/BouncingBall.pm</DT>
-<DD>Main application module, most of the code currently in ball.pl
-goes here.</DD>
 <DT>lib/BouncingBall/Model/Ball.pm</DT>
 <DD>Yes, I named our game BouncingBall, and the first model class is
 the ball itself, it will look much like the current code, but the
@@ -81,6 +78,8 @@ general idea is that we're going to have one controller for each of
 the main states of the game, like "MainMenu", "Paused", "InGame",
 "GameOver" etc. The InGame controller will implement the code that is
 currently inside the main loop of ball.pl</DD>
+<DT>lib/BouncingBall/View.pm</DT>
+<DD>This defines the types for the things that implement draw.</DD>
 <DT>lib/BouncingBall/View/Plane.pm</DT>
 <DD>This implements the background.</DD>
 <DT>lib/BouncingBall/View/FilledRect.pm</DT>
@@ -155,7 +154,9 @@ view decoupled in terms of threading.</P>
 proper model objects, at first, simply removing the "get_rect" and
 "draw" methods. I'm not going to put all its code again here, but
 renaming the modules and removing that methods is the only thing I'm
-doing right now.</P>
+doing right now. The time_lapse is also simplfied to remove the
+automatic bounce, we're going to put extra walls to enclose the
+ball.</P>
 
 <P>Now we need to step-by-step get to the final code layout presented
 earlier, let's start by the view classes, and in that case, let's get
@@ -165,7 +166,7 @@ the most important view class, the MainSurface.</P>
 package BouncingBall::View::MainSurface;
 use Moose;
 use SDL ':all';
-use SDL::Video ':all';
+use SDL::Video;# ':all';
 
 has 'surface' => (is => 'rw');
 has 'width' => (is => 'ro', default => 800);
@@ -183,6 +184,8 @@ sub BUILD {
         ( $self->width, $self->height, $self->depth,
           SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_HWACCEL ))
         or die 'Error initializing video.';
+
+    return 1;
 }
 </PRE>
 
@@ -201,9 +204,11 @@ use Moose;
 use SDL::Video ':all';
 use SDL::Surface;
 
+with 'BouncingBall::View';
 has color     => ( is => 'rw',
                    default => 0 );
 has surface   => ( is => 'rw' );
+has rect_obj  => ( is => 'rw' );
 has color_obj => ( is => 'rw' );
 has main      => ( is => 'ro',
                    required => 1 );
@@ -214,6 +219,7 @@ sub BUILD {
     $self->_init_color_object;
     $self->_init_rect;
     $self->_fill_rect;
+    return 1;
 }
 
 sub _init_surface {
@@ -225,6 +231,7 @@ sub _init_surface {
           $self->main->height,
           $self->main->depth,
           0, 0, 0, 255 ) );
+    return 1;
 }
 
 sub _init_color_object {
@@ -232,9 +239,10 @@ sub _init_color_object {
     $self->color_obj
       ( SDL::Video::map_RGB
         ( $self->main->surface->format,
-          0xFF0000 & $self->color,
-          0x00FF00 & $self->color,
+          ((0xFF0000 & $self->color)>>16),
+          ((0x00FF00 & $self->color)>>8),
           0x0000FF & $self->color ));
+    return 1;
 }
 
 sub _init_rect {
@@ -244,6 +252,7 @@ sub _init_rect {
         ( 0, 0,
           $self->main->width,
           $self->main->height ) );
+    return 1;
 }
 
 sub _fill_rect {
@@ -252,6 +261,7 @@ sub _fill_rect {
         ( $self->surface,
           $self->rect_obj,
           $self->color_obj );
+    return 1;
 }
 
 after 'color' => sub {
@@ -260,7 +270,7 @@ after 'color' => sub {
         $self->_init_color_object;
         $self->_fill_rect;
     }
-    return $color;
+    return 1;
 };
 
 sub draw {
@@ -268,6 +278,7 @@ sub draw {
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
           $self->main->surface, $self->rect_obj );
+    return 1;
 }
 </PRE>
 
@@ -287,6 +298,8 @@ coordinate is visible at that moment.</P>
 <PRE>
 package BouncingBall::View::Camera;
 use Moose;
+
+with 'BouncingBall::Event::RectMovingObserver';
 
 has pointing_x => ( is => 'rw',
                     default => 0 );
@@ -319,12 +332,8 @@ sub height {
     return $self->px2m($self->pixels_h);
 }
 
-sub translate {
+sub translate_point {
     my ($self, $x, $y) = @_;
-    # here is where we translate our system from the simulated
-    # universe, where 0m is at the bottom and the screen where 0px is
-    # at the top of the screen.  We also translate the point relative
-    # to where the camera is pointing right now.
     my $uplf_x = $self->pointing_x - ($self->width / 2);
     my $uplf_y = $self->pointing_y - ($self->height / 2);
     my $rel_x = $x - $uplf_x;
@@ -333,6 +342,14 @@ sub translate {
     my $pix_y = $self->m2px($rel_y);
     my $inv_y = $self->pixels_h - $pix_y;
     return ($pix_x, $inv_y);
+}
+
+sub translate_rect {
+    my ($self, $x, $y, $w, $h) = @_;
+    my ($pix_x, $inv_y) = $self->translate_point($x, $y);
+    my $pix_h = $self->m2px($h);
+    my $pix_w = $self->m2px($w);
+    return ($pix_x, $inv_y - $pix_h, $pix_w, $pix_h);
 }
 
 sub is_visible {
@@ -359,6 +376,9 @@ use Moose;
 use SDL::Video ':all';
 use SDL::Surface;
 
+with 'BouncingBall::View';
+with 'BouncingBall::Event::RectMovingObserver';
+
 has x         => ( is => 'rw',
                    default => 0 );
 has y         => ( is => 'rw',
@@ -383,6 +403,7 @@ sub BUILD {
     $self->_init_color_object;
     $self->_init_rect;
     $self->_fill_rect;
+    return 1;
 }
 
 sub _init_surface {
@@ -394,6 +415,7 @@ sub _init_surface {
           $self->camera->m2px($self->h),
           $self->main->depth,
           0, 0, 0, 255 ) );
+    return 1;
 }
 
 sub _init_color_object {
@@ -401,9 +423,10 @@ sub _init_color_object {
     $self->color_obj
       ( SDL::Video::map_RGB
         ( $self->main->surface->format,
-          0xFF0000 & $self->color,
-          0x00FF00 & $self->color,
+          ((0xFF0000 & $self->color)>>16),
+          ((0x00FF00 & $self->color)>>8),
           0x0000FF & $self->color ));
+    return 1;
 }
 
 sub _init_rect {
@@ -413,14 +436,16 @@ sub _init_rect {
         ( 0, 0,
           $self->camera->m2px($self->w),
           $self->camera->m2px($self->h) ) );
+    return 1;
 }
 
 sub _fill_rect {
     my ($self) = @_;
     SDL::Video::fill_rect
-        ( $self->surface,
-          $self->rect_obj,
-          $self->color_obj );
+        ( $self->surface(),
+          $self->rect_obj(),
+          $self->color_obj() );
+    return 1;
 }
 
 after 'color' => sub {
@@ -429,7 +454,7 @@ after 'color' => sub {
         $self->_init_color_object;
         $self->_fill_rect;
     }
-    return $color;
+    return 1;
 };
 
 after qw(w h) => sub {
@@ -439,17 +464,20 @@ after qw(w h) => sub {
         $self->_init_rect;
         $self->_fill_rect;
     }
-    return $newval;
+    return 1;
 };
 
 sub draw {
     my ($self) = @_;
+    my $rect = SDL::Rect->new
+      ( $self->camera->translate_rect( $self->x, $self->y,
+                                       $self->w, $self->h ) );
+
     SDL::Video::blit_surface
         ( $self->surface, $self->rect_obj,
-          $self->main->surface,
-          SDL::Rect->new
-          ( $self->camera->translate( $self->x, $self->y ),
-            $self->rect_obj->w, $self->rect_obj->h ) );
+          $self->main->surface, $rect );
+
+    return 1;
 }
 </PRE>
 
@@ -487,21 +515,24 @@ has new_rect => ( is => 'ro',
 
 </PRE>
 
+<P>The rect class is implemented here because SDL::Rect expects
+integers as its members, and we don't want to loose the precision.</P>
+
 <PRE>
 package BouncingBall::Event::Rect;
 use Moose;
 
 has x => ( is => 'ro',
-           isa => 'Numeric',
+           isa => 'Num',
            required => 1 );
 has y => ( is => 'ro',
-           isa => 'Numeric',
+           isa => 'Num',
            required => 1 );
 has w => ( is => 'ro',
-           isa => 'Numeric',
+           isa => 'Num',
            required => 1 );
 has h => ( is => 'ro',
-           isa => 'Numeric',
+           isa => 'Num',
            required => 1 );
 </PRE>
 
@@ -534,15 +565,16 @@ sub remove_rect_moving_listener {
         }
     }
     if ($found) {
-        $self->rect_moving_listeners->splice($found, 1, ());
+        splice @{$self->rect_moving_listeners}, $found, 1, ();
     }
 }
 
 sub fire_rect_moved {
     my ($self, $old_rect, $new_rect) = @_;
-    my $ev = RectMoved->new({ old_rect => $old_rect,
-                              new_rect => $new_rect });
-    $self->rect_moving_listeners->map({ $_->rect_moved($ev) });
+    my %args = ( new_rect => $new_rect );
+    $args{old_rect} = $old_rect if $old_rect;
+    my $ev = RectMoved->new(\%args);
+    $_->rect_moved($ev) for @{$self->rect_moving_listeners};
 }
 </PRE>
 
@@ -597,3 +629,359 @@ sub rect_moved {
 <LI>Connect them together</LI>
 <LI>Orchestrate the time_lapse and the general rendering</LI>
 </OL>
+
+<P>So, in the end our controller looks like the following:</P>
+
+<PRE>
+package BouncingBall::Controller::InGame;
+use Moose;
+use MooseX::Types::Moose qw(ArrayRef);
+
+use SDL::Events ':all';
+use aliased 'BouncingBall::Model::Ball';
+use aliased 'BouncingBall::Model::Wall';
+use aliased 'BouncingBall::View';
+use aliased 'BouncingBall::View::Plane';
+use aliased 'BouncingBall::View::FilledRect';
+use aliased 'BouncingBall::View::Camera';
+use aliased 'BouncingBall::View::MainSurface';
+use aliased 'BouncingBall::Event::Rect';
+
+has 'ball' => ( is => 'rw',
+                isa => Ball,
+                default => sub { Ball->new() } );
+
+has 'main_surface' => ( is => 'ro',
+                        isa => MainSurface,
+                        required => 1 );
+
+has 'camera' => ( is => 'ro',
+                  isa => Camera );
+
+has 'walls' => ( traits => ['Array'],
+                 is => 'rw',
+                 isa => ArrayRef[Wall] );
+has 'views' => ( traits => ['Array'],
+                 is => 'rw',
+                 isa => ArrayRef[View] );
+
+
+sub BUILD {
+    my $self = shift;
+
+    my $background = Plane->new({ main => $self->main_surface,
+                                  color => 0xFFFFFF });
+
+    my $camera = Camera->new({ pixels_w => $self->main_surface->width,
+                               pixels_h => $self->main_surface->height,
+                               pointing_x => $self->ball->cen_h,
+                               pointing_y => $self->ball->cen_v });
+
+    my $ball_view = FilledRect->new({ color => 0x0000FF,
+                                      camera => $camera,
+                                      main => $self->main_surface,
+                                      x => $self->ball->pos_h,
+                                      y => $self->ball->pos_v,
+                                      w => $self->ball->width,
+                                      h => $self->ball->height });
+    $self->ball->add_rect_moving_listener($ball_view);
+
+    $self->views([]);
+    push @{$self->views}, $background, $ball_view;
+
+    $self->walls([]);
+
+    # now we need to build four walls, to enclose our ball.
+    foreach my $rect ( Rect->new({ x => 0,
+                                   y => 0,
+                                   w => 20,
+                                   h => 1 }),
+                       Rect->new({ x => 0,
+                                   y => 0,
+                                   h => 20,
+                                   w => 1 }),
+                       Rect->new({ x => 20,
+                                   y => 0,
+                                   h => 20,
+                                   w => 1 }),
+                       Rect->new({ x => 0,
+                                   y => 20,
+                                   w => 21,
+                                   h => 1 }),
+                       Rect->new({ x => 10,
+                                   y => 0,
+                                   h => 10,
+                                   w => 1 })) {
+
+        my $wall_model = Wall->new({ pos_v => $rect->y,
+                                     pos_h => $rect->x,
+                                     width => $rect->w,
+                                     height => $rect->h });
+
+        push @{$self->walls}, $wall_model;
+
+        my $wall_view = FilledRect->new({ color => 0xFF0000,
+                                          camera => $camera,
+                                          main => $self->main_surface,
+                                          x => $rect->x,
+                                          y => $rect->y,
+                                          w => $rect->w,
+                                          h => $rect->h });
+
+        push @{$self->views}, $wall_view;
+
+    }
+
+}
+
+sub handle_sdl_event {
+    my ($self, $sevent) = @_;
+
+    my $ball = $self->ball;
+    my $type = $sevent->type;
+
+    if ($type == SDL_KEYDOWN &&
+        $sevent->key_sym() == SDLK_LEFT) {
+        $ball->acc_h(-5);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_LEFT) {
+        $ball->acc_h(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_RIGHT) {
+        $ball->acc_h(5);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_RIGHT) {
+        $ball->acc_h(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_UP) {
+        $ball->acc_v(5);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_UP) {
+        $ball->acc_v(0);
+
+    } elsif ($type == SDL_KEYDOWN &&
+             $sevent->key_sym() == SDLK_DOWN) {
+        $ball->acc_v(-5);
+
+    } elsif ($type == SDL_KEYUP &&
+             $sevent->key_sym() == SDLK_DOWN) {
+        $ball->acc_v(0);
+
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
+sub handle_frame {
+    my ($self, $oldtime, $now) = @_;
+
+    my $frame_elapsed_time = ($now - $oldtime)/1000;
+
+    my $ball = $self->ball;
+    my $collided = 0;
+    foreach my $wall (@{$self->walls}) {
+        if (my $coll = collide($ball, $wall, $frame_elapsed_time)) {
+            # need to place the ball in the result after the bounce given
+            # the time elapsed after the collision.
+            my $collision_remaining_time = $frame_elapsed_time - $coll->time;
+            my $movement_before_collision_h = $ball->vel_h * $coll->time;
+            my $movement_before_collision_v = $ball->vel_v * $coll->time;
+            my $movement_after_collision_h = $ball->vel_h * $collision_remaining_time;
+            my $movement_after_collision_v = $ball->vel_v * $collision_remaining_time;
+            if ($coll->axis eq 'x') {
+                $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                             ($movement_after_collision_h * -1));
+                $ball->cen_v($ball->cen_v +
+                             $movement_before_collision_v +
+                             $movement_after_collision_v);
+                $ball->vel_h($ball->vel_h * -1);
+            } elsif ($coll->axis eq 'y') {
+                $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                             ($movement_after_collision_v * -1));
+                $ball->cen_h($ball->cen_h +
+                             $movement_before_collision_h +
+                             $movement_after_collision_h);
+                $ball->vel_v($ball->vel_v * -1);
+            } elsif (ref $coll->axis eq 'ARRAY') {
+                my ($xv, $yv) = @{$coll->bounce_vector};
+                $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                             ($xv * $collision_remaining_time));
+                $ball->vel_h($xv);
+                $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                             ($yv * $collision_remaining_time));
+                $ball->vel_v($yv);
+            } else {
+                warn 'BAD BALL!';
+                $ball->cen_h(($ball->cen_h + $movement_before_collision_h) +
+                             ($movement_after_collision_h * -1));
+                $ball->cen_v(($ball->cen_v + $movement_before_collision_v) +
+                             ($movement_after_collision_v * -1));
+                $ball->vel_h($ball->vel_h * -1);
+                $ball->vel_v($ball->vel_v * -1);
+            }
+            $collided = 1;
+        }
+    }
+
+    if (!$collided) {
+        $ball->time_lapse($oldtime, $now);
+    }
+
+    foreach my $view (@{$self->views}) {
+        my $ret = $view->draw();
+    }
+
+    SDL::Video::flip($self->main_surface->surface);
+
+}
+
+use Collision::2D ':all';
+sub collide {
+    my ($ball, $wall, $time) = @_;
+    my $rect = hash2rect({ x => $wall->pos_h, y => $wall->pos_v,
+                           h => $wall->height, w => $wall->width });
+    my $circ = hash2circle({ x => $ball->cen_h, y => $ball->cen_v,
+                             radius => $ball->radius,
+                             xv => $ball->vel_h,
+                             yv => $ball->vel_v });
+    return dynamic_collision($circ, $rect, interval => $time);
+}
+</PRE>
+
+<P>And with all the reorganization, the main ball.pl code is now
+pretty simple:</P>
+
+<PRE>
+#!/usr/bin/perl
+
+use 5.10.0;
+use strict;
+use warnings;
+
+use SDL;
+use SDL::Event;
+use SDL::Events;
+
+use lib 'lib';
+
+use aliased 'BouncingBall::Controller::InGame';
+use aliased 'BouncingBall::View::MainSurface';
+
+SDL::init( SDL_INIT_EVERYTHING );
+
+my $fps = 60;
+
+my $surf = MainSurface->new();
+
+my $sevent = SDL::Event->new();
+my $time = SDL::get_ticks;
+
+my $controller = InGame->new({ main_surface => $surf });
+
+while (1) {
+    my $oldtime = $time;
+    my $now = SDL::get_ticks;
+
+    while (SDL::Events::poll_event($sevent)) {
+        my $type = $sevent->type;
+        if ($type == SDL_QUIT) {
+            exit;
+        } elsif ($controller->handle_sdl_event($sevent)) {
+            # handled.
+        } else {
+            # unknown event.
+        }
+    }
+
+    $controller->handle_frame($time, $now);
+
+    $time = SDL::get_ticks;
+    SDL::delay(1000/$fps);
+}
+</PRE>
+
+<H3>The case for the Camera!</H3>
+
+<P>We started this post around the idea of making a camera, but we
+haven't done anything really interesting with it. So now I'm going to
+implement the really usefull part of all this thing we've done.</P>
+
+<P>Currently the camera is being set as looking at the point the ball
+starts, but soon enough, the ball is going to get too close to the
+bottom border of the screen.</P>
+
+<P>The idea is pretty simple, try to keep the ball inside a threshold
+margin by moving the camera when it gets too close of the border.</P>
+
+<P>What makes this really simple is the fact that we just need to do
+two things:</P>
+
+<OL>
+  <LI>Add the camera as an observer of the ball.</LI>
+  <LI>Implement the chasing logic in the rect_moved method</LI>
+</OL>
+
+<P>And that's all. Really. So here are all the code we need to make
+the camera chase the ball:</P>
+
+<PRE>
+# in the controller, we just need to add one line, after the camera
+# initialization.
+$self->ball->add_rect_moving_listener($camera);
+</PRE>
+
+<P>And then we need to implement rect_moved on the camera:</P>
+
+<PRE>
+sub rect_moved {
+    my ($self, $ev) = @_;
+    # implement a loose following of the ball.  if the ball gets near
+    # the border of the screen, we follow it so it stays inside the
+    # desired area.
+
+    my $lf_x = $self->pointing_x - ($self->width / 2);
+    my $br_lf_x = $lf_x + $self->width * 0.2;
+
+    my $rt_x = $self->pointing_x + ($self->width / 2);
+    my $br_rt_x = $rt_x - $self->width * 0.2;
+
+    my $up_y = $self->pointing_y + ($self->height / 2);
+    my $br_up_y = $up_y - $self->height * 0.2;
+
+    my $dw_y = $self->pointing_y - ($self->height / 2);
+    my $br_dw_y = $dw_y + $self->height * 0.2;
+
+    if ($ev->new_rect->x < $br_lf_x) {
+        $self->pointing_x( $self->pointing_x - ($br_lf_x - $ev->new_rect->x))
+    } elsif ($ev->new_rect->x > $br_rt_x) {
+        $self->pointing_x( $self->pointing_x + ($ev->new_rect->x - $br_rt_x));
+    }
+
+    if ($ev->new_rect->y < $br_dw_y) {
+        $self->pointing_y( $self->pointing_y - ($br_dw_y - $ev->new_rect->y))
+    } elsif ($ev->new_rect->y > $br_up_y) {
+        $self->pointing_y( $self->pointing_y + ($ev->new_rect->y - $br_up_y));
+    }
+
+    return 1;
+}
+</PRE>
+
+<P>And that's all. That's the joy of a properly designed MVC
+architecture.</P>
+
+<P>As usual, follows a small video of the game.</P>
+
+
+<object width="480" height="385"><param name="movie"
+value="http://www.youtube.com/v/BZWWfI0hTJc&hl=pt_BR&fs=1&"></param><param name="allowFullScreen"
+value="true"></param><param name="allowscriptaccess"
+value="always"></param><embed src="http://www.youtube.com/v/BZWWfI0hTJc&hl=pt_BR&fs=1&"
+type="application/x-shockwave-flash" allowscriptaccess="always"
+allowfullscreen="true" width="480" height="385"></embed></object>

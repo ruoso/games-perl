@@ -28,8 +28,9 @@ sub remove_rect_moving_listener {
 
 sub fire_rect_moved {
     my ($self, $old_rect, $new_rect) = @_;
-    my $ev = RectMoved->new({ old_rect => $old_rect,
-                              new_rect => $new_rect });
+    my %args = ( new_rect => $new_rect );
+    $args{old_rect} = $old_rect if $old_rect;
+    my $ev = RectMoved->new(\%args);
     $_->rect_moved($ev) for @{$self->rect_moving_listeners};
 }
 
