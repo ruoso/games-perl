@@ -150,7 +150,7 @@ view decoupled in terms of threading.</P>
 
 <h3>To the code</h3>
 
-<P>The first thing we need to do is porting our Ball and Wall into
+<P>The first thing we need to do is port our Ball and Wall into
 proper model objects, at first, simply removing the "get_rect" and
 "draw" methods. I'm not going to put all its code again here, but
 renaming the modules and removing that methods is the only thing I'm
@@ -487,8 +487,8 @@ model changes.</P>
 
 <P>One important aspect on how the MVC model works is that the
 controller should have just a limited control on the interaction
-between the model and the view, otherwise you'll get a very
-complicated code in the controller. Ideally you should have the same
+between the model and the view, otherwise you'll get very
+complicated code in the controller. Ideally, you should have the same
 level of abstraction in the model as you have in the view, so you have
 componentization of your application.</P>
 
@@ -516,7 +516,7 @@ has new_rect => ( is => 'ro',
 </PRE>
 
 <P>The rect class is implemented here because SDL::Rect expects
-integers as its members, and we don't want to loose the precision.</P>
+integers as its members, and we don't want to lose the precision.</P>
 
 <PRE>
 package BouncingBall::Event::Rect;
@@ -588,8 +588,8 @@ requires 'rect_moved';
 </PRE>
 
 <P>Now we need to make our Ball model class fire that event whenever
-its position or size attributes are changed. So we're goint to add the
-following modifiers to the attributes. At first we're not going to
+its position or size attributes are changed. So we're going to add the
+following modifiers to the attributes. At first, we're not going to
 support the old_rect attribute of the event, so we're just sending the
 new_rect.</P>
 
@@ -608,7 +608,7 @@ after qw(cen_v cen_h) => sub {
 }
 </PRE>
 
-<P>And finally adding the observer code in the view class.</P>
+<P>And finally, adding the observer code in the view class:</P>
 
 <PRE>
 with 'BouncingBall::Event::RectMovingObserver';
@@ -910,13 +910,13 @@ while (1) {
 
 <P>We started this post around the idea of making a camera, but we
 haven't done anything really interesting with it. So now I'm going to
-implement the really usefull part of all this thing we've done.</P>
+implement the really useful part of all this thing we've done.</P>
 
-<P>Currently the camera is being set as looking at the point the ball
+<P>Currently, the camera is being set as looking at the point the ball
 starts, but soon enough, the ball is going to get too close to the
 bottom border of the screen.</P>
 
-<P>The idea is pretty simple, try to keep the ball inside a threshold
+<P>The idea is pretty simple: try to keep the ball inside a threshold
 margin by moving the camera when it gets too close of the border.</P>
 
 <P>What makes this really simple is the fact that we just need to do
@@ -927,7 +927,7 @@ two things:</P>
   <LI>Implement the chasing logic in the rect_moved method</LI>
 </OL>
 
-<P>And that's all. Really. So here are all the code we need to make
+<P>And that's all. Really. So here is all the code we need to make
 the camera chase the ball:</P>
 
 <PRE>
