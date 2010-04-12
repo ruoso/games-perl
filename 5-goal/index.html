@@ -1,0 +1,195 @@
+<P>Following
+posts <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">1</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">2</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-3">3</A> and
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-4">4</A>
+on the subject of writing games in Perl, now we are going to add
+a goal to our game.</P>
+
+<P>Currently we have a bouncing ball with that collides in walls and
+have a camera following it. Now we are about to add a goal to the
+game. The idea is that you should get the ball to hit some specific
+point, considering the gravity and the 100% efficient bounce, making
+the ball go through some small places might be an interesting
+challenge.</P>
+
+<P>The first thing we're going to do is change the walls
+configuration, so we make a more challenging setup, currently we have
+a box with a wall of half the height in the middle, let's make it a
+bit more interesting, let's change the walls initialization code to
+the following.</P>
+
+<PRE>
+    foreach my $rect ( Rect->new({ x => 0,
+                                   y => 0,
+                                   w => 20,
+                                   h => 1 }), # left wall
+                       Rect->new({ x => 0,
+                                   y => 0,
+                                   h => 20,
+                                   w => 1 }), # bottom wall
+                       Rect->new({ x => 20,
+                                   y => 0,
+                                   h => 20,
+                                   w => 1 }), # right wall
+                       Rect->new({ x => 0,
+                                   y => 20,
+                                   w => 21,
+                                   h => 1 }), # top wal
+                       Rect->new({ x => 7,
+                                   y => 0,
+                                   h => 9,
+                                   w => 1 }), # middle-left bottom
+                       Rect->new({ x => 7,
+                                   y => 11,
+                                   h => 9,
+                                   w => 1 }), # middle-left top
+                       Rect->new({ x => 12,
+                                   y => 0,
+                                   h => 9,
+                                   w => 1 }), # middle-right bottom
+                       Rect->new({ x => 12,
+                                   y => 11,
+                                   h => 9,
+                                   w => 1 }), # middle-right top
+                     ) {
+      # ...
+    }
+</PRE>
+
+<P>This creates two small passages in the middle of two vertical
+walls, not really hard, but kinda entertaining to get the ball to go
+through those. But in order to make it actually hard, let's add
+another wall:</P>
+
+<PRE>
+                       Rect->new({ x => 9.2,
+                                   y => 11,
+                                   h => 1,
+                                   w => 1.6 }), # chamber
+</PRE>
+
+<P>Now we have a small chamber created between the two vertical
+lines. It's kinda tricky to get the ball in there, I personally took
+some minutes.</P>
+
+<P>But while I was testing this map, a bug appeared, and this is
+actually an important bug. Since the collision was pretty simplified
+to handle just one wall at the beginning, I was inadvertedly
+positioning the ball at the target destination after it bounced. This
+was ok when I had just one wall, but when I have more, and more
+importantly, when they are really close to each other, I might
+position the ball over another wall when detecting a collision, and
+that just, well, you have a ball inside a wall, unless you're watching
+the X Files, this can't be good.</P>
+
+<P>The problem, as you might have noticed, happens when I calculate
+the target position after the bounce, so what we're going to do is
+simply stop trying to guess that. We're going to position the ball in
+the exactly spot before the collision with the bouncing velocities and
+recalculate the whole frame from that instant on.</P>
+
+<P>This will actually mean a simplification of the code, that will
+look like:</P>
+
+<PRE>
+    foreach my $wall (@{$self->walls}) {
+        if (my $coll = collide($ball, $wall, $frame_elapsed_time)) {
+            # need to place the ball in the result after the bounce given
+            # the time elapsed after the collision.
+            my $collision_remaining_time = $frame_elapsed_time - $coll->time;
+            my $movement_before_collision_h = $ball->vel_h * ($coll->time - 0.001);
+            my $movement_before_collision_v = $ball->vel_v * ($coll->time - 0.001);
+            $ball->cen_h($ball->cen_h + $movement_before_collision_h);
+            $ball->cen_v($ball->cen_v + $movement_before_collision_v);
+            if ($coll->axis eq 'x') {
+                $ball->vel_h($ball->vel_h * -1);
+            } elsif ($coll->axis eq 'y') {
+                $ball->vel_v($ball->vel_v * -1);
+            } elsif (ref $coll->axis eq 'ARRAY') {
+                my ($xv, $yv) = @{$coll->bounce_vector};
+                $ball->vel_h($xv);
+                $ball->vel_v($yv);
+            } else {
+                warn 'BAD BALL!';
+                $ball->vel_h($ball->vel_h * -1);
+                $ball->vel_v($ball->vel_v * -1);
+            }
+            return $self->handle_frame($oldtime + ($coll->time*1000), $now);
+        }
+    }
+    $ball->time_lapse($oldtime, $now);
+</PRE>
+
+<P>Now, to add a goal, we're going to add another set of objects, the
+goal itself, which is simply a point, and the view, which I'm also
+going to reuse the filled rect view. First I'm going to create a Point
+object akin to the Rect I have created earlier.</P>
+
+<PRE>
+package BouncingBall::Event::Point;
+use Moose;
+
+has x => ( is => 'ro',
+           isa => 'Num',
+           required => 1 );
+has y => ( is => 'ro',
+           isa => 'Num',
+           required => 1 );
+</PRE>
+
+<P>Now I'm going to add that point object to the controller as an
+attribute:</P>
+
+<PRE>
+use aliased 'BouncingBall::Event::Point';
+
+has 'goal' => ( isa => 'rw',
+                isa => Point );
+</PRE>
+
+<P>And now initialize both the goal and the view for it.</P>
+
+<PRE>
+    $self->goal(Point->new({ x => 10, y => 12.5 }));
+    my $goal_view = FilledRect->new({ color => 0xFFFF00,
+                                      camera => $camera,
+                                      main => $self->main_surface,
+                                      x => $self->goal->x - 0.1,
+                                      y => $self->goal->y - 0.1,
+                                      w => 0.2,
+                                      h => 0.2 });
+
+    $self->views([]);
+    push @{$self->views}, $background, $ball_view, $goal_view;
+</PRE>
+
+<P>Ok, now that we can see our goal, we just need to detect when the
+goal was achieved:</P>
+
+<PRE>
+sub collide_goal {
+    my ($ball, $goal, $time) = @_;
+    my $rect = hash2point({ x => $goal->x, y => $goal->y });
+    my $circ = hash2circle({ x => $ball->cen_h, y => $ball->cen_v,
+                             radius => $ball->radius,
+                             xv => $ball->vel_h,
+                             yv => $ball->vel_v });
+    return dynamic_collision($circ, $rect, interval => $time);
+}
+#...
+sub reset_ball {
+    my ($self) = @_;
+    $self->ball(Ball->new());
+}
+#...
+if (collide_goal($ball, $self->goal, $frame_elapsed_time)) {
+    $self->reset_ball();
+}
+</PRE>
+
+<P>Ok, not very exciting, but something does happen, and that's a
+first step.</P>
+
+<P>As usual, follows a small video of the game.</P>
+
