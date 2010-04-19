@@ -1,0 +1,217 @@
+<P>Following
+posts <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">1</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">2</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-3">3</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-4">4</A> and
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-5">5</A> on
+the subject of writing games in Perl, now we are going to fix the math
+in the game.</P>
+
+<P>In the first post, I used a very naive simplification of the
+movement calculation. I simply considered that the velocity was
+constant during the time of the frame and recalculated the final
+velocity after the frame so it would affect the next calculation.</P>
+
+<P>I have to confess that I didn't do it just for the simplification
+of the code. I did it because of my lack of good understanding of
+math. Some people have noticed that I should've used
+a <a href="en.wikipedia.org/wiki/Runge–Kutta_methods">Runge-Kutta</a>
+method to solve the problem, but, honestly, the math language is
+something that really requires a level of practice I simply don't have
+(I've been working on Information Systems for 12 years, now it's the
+first time I really miss calculus knowledge).</P>
+
+<P>The problem I was trying to solve is: Considering I have a ball
+that is falling at a speed of 3 m/s with a gravity of 9.8 m/s², how
+far would it fall after 25 miliseconds (about 40 FPS). I'm strongly
+visually-oriented, so let me try to represent in some ascii-art what I
+was trying to find out.</P>
+
+<PRE>
+position | .
+         |  I
+         |   .
+         |
+         |    .
+         |   
+         |
+         |     F
+         |
+         |
+         |      .
+         0-------------------------
+          time
+</PRE>
+
+<P>I was considering I had defined the position I (initial) and I
+wanted to know which was the position F (final).</P>
+
+<P>It was only after I shared the problem with Edilson (a colleague
+that works in the same place as I do), and after he present me a sheet
+full of math calculations which I simply ignored, since I couldn't
+understand, and then he said me: "You're looking at the wrong graphic,
+this graphic is derived from another graphic, which is velocity vs
+time".</P>
+
+<P>This was a very important realization for me, bear with me: Let's
+simplify the problem a bit, let's consider we have a constant
+velocity. The graphic of velocity vs time would be something like:</P>
+
+<PRE>
+velocity |
+         |
+         |
+         |
+         |
+         |
+         |.......I..........F.....
+         |
+         |
+         |
+         |
+         0-------------------------
+          time
+</PRE>
+
+<P>You probably remember that in order to find out how much an object
+moved in a given time-frame, the formula would be:</P>
+
+<PRE>
+     ΔS = Δt * v
+</PRE>
+
+<P>As I said before, I'm a very visually-oriented person, and at that
+point I figured out the following:</P>
+
+<PRE>
+velocity |
+         |
+         |
+         |
+         |
+         |
+         |       I..........F     
+         |       |          |
+         |       |          |
+         |       |          |
+         |       |          |
+         0-------------------------
+          time
+</PRE>
+
+<P>Wait, that's a rectangle, its width is Δt and it's height is v,
+so the distance travelled is the area of the rectangle.</P>
+
+<P>WAIT! That's the definition of Integral I've been reading in math
+books for a while and that never really meant anything to me because
+of all the math blabbering that really require consistent math
+practice to actually understand anything.</P>
+
+<P>So now that I feel a lot less dumb, let's proceed to the problem at
+hand. The velocity in our game is lineary-variable, which means that
+its graphic over time will look like:</P>
+
+<PRE>
+velocity |                  .
+         |                .
+         |              .
+         |            F
+         |          .
+         |        .
+         |      .
+         |    I
+         |  .
+         |.
+         |
+         0-------------------------
+          time
+</PRE>
+
+<P>The intial grahic on the position over time at the beggining of
+this post is derived from this graphic -- and this is actually the
+meaning of derivative -- so the distance travelled in a given time
+frame is the area of the trapezoid representing that time frame:</P>
+
+<PRE>
+velocity |
+         |
+         |
+         |            F
+         |          . |
+         |        .   |
+         |      .     |
+         |    I       |
+         |    |       |
+         |    |       |
+         |    |       |
+         0-------------------------
+          time
+</PRE>
+
+<P>So, the answer to my initial question is just a matter of
+calculating that area:</P>
+
+<PRE>
+     Δs = ((vI + vF) * Δt)/2
+</PRE>
+
+<P>It looks pretty easy now, and, in fact, I feel quite dumb for
+taking so long to realize that. But anyway, that is probably all the
+required math for a lot of games. I hope I wasn't the only one who had
+a hard time understading all that, and, anyway, now I can start to
+understand more complex integral and derivative calculations.</P>
+
+<P>So, let's apply that to the code in our game, which happens to be
+at the Ball.pm file.</P>
+
+<PRE>
+sub time_lapse {
+  my ($self, $old_time, $new_time) = @_;
+  my $elapsed = ($new_time - $old_time)/1000; # convert to seconds...
+
+  my $vf_h = $self->vel_h + $self->acc_h * $elapsed;
+  my $vf_v = $self->vel_v + ($self->acc_v - g) * $elapsed;
+
+  my $ds_h = (($self->vel_h + $vf_h) * $elapsed) / 2;
+  my $ds_v = (($self->vel_v + $vf_v) * $elapsed) / 2;
+
+  $self->vel_h($vf_h);
+  $self->vel_v($vf_v);
+  $self->cen_h($self->cen_h + $ds_h);
+  $self->cen_v($self->cen_v + $ds_v);
+}
+</PRE>
+
+<P>I also fixed the code in the main loop that was re-calculating that
+instead of calling time_lapse.</P>
+
+<PRE>
+    foreach my $wall (@{$self->walls}) {
+        if (my $coll = collide($ball, $wall, $frame_elapsed_time)) {
+            # need to place the ball in the result after the bounce given
+            # the time elapsed after the collision.
+            $ball->time_lapse($oldtime, $oldtime + (($coll->time)*1000) - 1);
+
+            if (defined $coll->axis &&
+                $coll->axis eq 'x') {
+                $ball->vel_h($ball->vel_h * -1);
+            } elsif (defined $coll->axis &&
+                     $coll->axis eq 'y') {
+                $ball->vel_v($ball->vel_v * -1);
+            } elsif (defined $coll->axis &&
+                     ref $coll->axis eq 'ARRAY') {
+                my ($xv, $yv) = @{$coll->bounce_vector};
+                $ball->vel_h($xv);
+                $ball->vel_v($yv);
+            } else {
+                warn 'BAD BALL!';
+                $ball->vel_h($ball->vel_h * -1);
+                $ball->vel_v($ball->vel_v * -1);
+            }
+            return $self->handle_frame($oldtime + ($coll->time*1000), $now);
+        }
+    }
+</PRE>
+
+<P>I'm not going to post any video for this post, since there's no
+visual difference. But I hope the ascii-art graphics are good enough.</P>
