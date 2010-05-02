@@ -143,3 +143,133 @@ maps in alphabetical order, so I'm going to save it as
 
 <h3>Loading the map</h3>
 
+<P>As the various objects were being created in the InGame controller
+initialization, we're simply going to replace the hard-coded
+initialization for the map-based loading.</P>
+
+<P>The first step, which might happen at compile time, is building the
+XML::Compile::Schema closure that will parse the map.</P>
+
+<PRE>
+use XML::Compile::Schema;
+use XML::Compile::Util qw(pack_type);
+use constant MAP_NS => 'http://daniel.ruoso.com/categoria/perl/games-perl-7';
+my $s = XML::Compile::Schema->new('schema/map.xsd');
+my $r = $s->compile('READER', pack_type(MAP_NS, 'map'),
+                    sloppy_floats => 1);
+</PRE>
+
+<P>$r is a code-reference that you call sending the xml document.</P>
+
+<P>We also want to add a new attribute to the controller which will
+provide the map name:</P>
+
+<PRE>
+has 'mapname' => ( is => 'ro',
+                   isa => 'Str',
+                   required => 1 );
+</PRE>
+
+<P>For simplification sake, we're going to just send the name of the
+first map in the controller ->new call:</P>
+
+<PRE>
+my $controller = InGame->new({ main_surface => $surf,
+                               mapname => 'maps/00_original_map.xml' });
+</PRE>
+
+
+<P>And the InGame initialization code now looks like:</P>
+
+<PRE>
+sub BUILD {
+    my $self = shift;
+
+    my $background = Plane->new({ main => $self->main_surface,
+                                  color => 0xFFFFFF });
+
+    my $camera = Camera->new({ pixels_w => $self->main_surface->width,
+                               pixels_h => $self->main_surface->height,
+                               pointing_x => $self->ball->cen_h,
+                               pointing_y => $self->ball->cen_v });
+
+    my $map = $r->($self->mapname);
+
+    # first, let's set the ball position and radius.
+    $self->ball->cen_h($map->{ball}{x});
+    $self->ball->cen_v($map->{ball}{y});
+    $self->ball->radius($map->{ball}{radius});
+
+    # attach the ball to the camera.
+    $self->ball->add_rect_moving_listener($camera);
+
+    # create the ball view
+    my $ball_view = FilledRect->new({ color => 0x0000FF,
+                                      camera => $camera,
+                                      main => $self->main_surface,
+                                      x => $self->ball->pos_h,
+                                      y => $self->ball->pos_v,
+                                      w => $self->ball->width,
+                                      h => $self->ball->height });
+    $self->ball->add_rect_moving_listener($ball_view);
+
+    # now create the goal
+    $self->goal(Point->new($map->{goal}));
+    my $goal_view = FilledRect->new({ color => 0xFFFF00,
+                                      camera => $camera,
+                                      main => $self->main_surface,
+                                      x => $self->goal->x - 0.1,
+                                      y => $self->goal->y - 0.1,
+                                      w => 0.2,
+                                      h => 0.2 });
+
+    $self->views([]);
+    push @{$self->views}, $background, $ball_view, $goal_view;
+    $self->walls([]);
+
+    # now we need to build four walls, to enclose our ball.
+    foreach my $rect (map { Rect->new($_) } @{$map->{wall}}) {
+
+        my $wall_model = Wall->new({ pos_v => $rect->y,
+                                     pos_h => $rect->x,
+                                     width => $rect->w,
+                                     height => $rect->h });
+
+        push @{$self->walls}, $wall_model;
+
+        my $wall_view = FilledRect->new({ color => 0xFF0000,
+                                          camera => $camera,
+                                          main => $self->main_surface,
+                                          x => $rect->x,
+                                          y => $rect->y,
+                                          w => $rect->w,
+                                          h => $rect->h });
+
+        push @{$self->views}, $wall_view;
+
+    }
+
+}
+</PRE>
+
+<P>At this point, the game is fully functional with the original map,
+now we can proceed to the next point.</P>
+
+<h3>Map cycling</h3>
+
+<P>We already have a goal in each map, so we need to react when the
+goal is reached so the next map is loaded. As you might have noticed,
+the InGame controller is completely tied to each map, so what we need
+to do is replace the controller instance by one with the new map.</P>
+
+<P>There's one important point in the way our ball.pl script handles
+the main loop, it is not fully delegated to the controller, but it
+tries to handle the global events before it sends it to the
+controller.</P>
+
+<P>What this means is that we can use an User SDL event to signal the
+main application that the goal for this controller instance was
+already achieved and that it should initialize the next
+controller.</P>
+
+<P>To do that, we 

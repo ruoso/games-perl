@@ -22,7 +22,8 @@ my $surf = MainSurface->new();
 my $sevent = SDL::Event->new();
 my $time = SDL::get_ticks;
 
-my $controller = InGame->new({ main_surface => $surf });
+my $controller = InGame->new({ main_surface => $surf,
+                               mapname => 'maps/00_original_map.xml' });
 
 while (1) {
     my $oldtime = $time;

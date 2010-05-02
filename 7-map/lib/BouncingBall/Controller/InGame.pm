@@ -13,6 +13,17 @@ use aliased 'BouncingBall::View::MainSurface';
 use aliased 'BouncingBall::Event::Rect';
 use aliased 'BouncingBall::Event::Point';
 
+use XML::Compile::Schema;
+use XML::Compile::Util qw(pack_type);
+use constant MAP_NS => 'http://daniel.ruoso.com/categoria/perl/games-perl-7';
+my $s = XML::Compile::Schema->new('schema/map.xsd');
+my $r = $s->compile('READER', pack_type(MAP_NS, 'map'),
+                    sloppy_floats => 1);
+
+has 'mapname' => ( is => 'ro',
+                   isa => 'Str',
+                   required => 1 );
+
 has 'ball' => ( is => 'rw',
                 isa => Ball,
                 default => sub { Ball->new() } );
@@ -45,8 +56,18 @@ sub BUILD {
                                pixels_h => $self->main_surface->height,
                                pointing_x => $self->ball->cen_h,
                                pointing_y => $self->ball->cen_v });
+
+    my $map = $r->($self->mapname);
+
+    # first, let's set the ball position and radius.
+    $self->ball->cen_h($map->{ball}{x});
+    $self->ball->cen_v($map->{ball}{y});
+    $self->ball->radius($map->{ball}{radius});
+
+    # attach the ball to the camera.
     $self->ball->add_rect_moving_listener($camera);
 
+    # create the ball view
     my $ball_view = FilledRect->new({ color => 0x0000FF,
                                       camera => $camera,
                                       main => $self->main_surface,
@@ -56,7 +77,8 @@ sub BUILD {
                                       h => $self->ball->height });
     $self->ball->add_rect_moving_listener($ball_view);
 
-    $self->goal(Point->new({ x => 10, y => 12.5 }));
+    # now create the goal
+    $self->goal(Point->new($map->{goal}));
     my $goal_view = FilledRect->new({ color => 0xFFFF00,
                                       camera => $camera,
                                       main => $self->main_surface,
@@ -67,47 +89,10 @@ sub BUILD {
 
     $self->views([]);
     push @{$self->views}, $background, $ball_view, $goal_view;
-
     $self->walls([]);
 
     # now we need to build four walls, to enclose our ball.
-    foreach my $rect ( Rect->new({ x => 0,
-                                   y => 0,
-                                   w => 20,
-                                   h => 1 }), # left wall
-                       Rect->new({ x => 0,
-                                   y => 0,
-                                   h => 20,
-                                   w => 1 }), # bottom wall
-                       Rect->new({ x => 20,
-                                   y => 0,
-                                   h => 20,
-                                   w => 1 }), # right wall
-                       Rect->new({ x => 0,
-                                   y => 20,
-                                   w => 21,
-                                   h => 1 }), # top wal
-                       Rect->new({ x => 7,
-                                   y => 0,
-                                   h => 9,
-                                   w => 1 }),
-                       Rect->new({ x => 7,
-                                   y => 11,
-                                   h => 9,
-                                   w => 1 }),
-                       Rect->new({ x => 12,
-                                   y => 0,
-                                   h => 9,
-                                   w => 1 }),
-                       Rect->new({ x => 12,
-                                   y => 11,
-                                   h => 9,
-                                   w => 1 }),
-                       Rect->new({ x => 9.2,
-                                   y => 11,
-                                   h => 1,
-                                   w => 1.6 }),
-                     ) {
+    foreach my $rect (map { Rect->new($_) } @{$map->{wall}}) {
 
         my $wall_model = Wall->new({ pos_v => $rect->y,
                                      pos_h => $rect->x,
