@@ -1,0 +1,145 @@
+<P>Following
+posts <a href="http://daniel.ruoso.com/categoria/perl/games-perl-1">1</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-2">2</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-3">3</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-4">4</A>,
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-5">5</A> and
+<a href="http://daniel.ruoso.com/categoria/perl/games-perl-6">6</A> on
+the subject of writing games in Perl, now we are going to add support
+for maps.</P>
+
+<P>At this moment, the initial ball position, as well as the walls are
+being defined in Perl code, during the controller initialization. What
+we are going to do now is creating a serialization format that
+describes our simulated universe, then have a set of maps in a
+directory navigating through them as the goals in each map are
+achieved.</P>
+
+<h3>The Map Format</h3>
+
+<P>There are several options to serialize and deserialize data, some
+are easier to use, others provide more introspection and others are
+better performant. I've read once a good advice in game development,
+which is: keep your map format accessible to art people.</P>
+
+<P>A lot of people hate XML, I'm not of that club, I do like XML a
+lot, specially because it allows introspection and validation via XML
+Schema. And after the advent of XML::Compile::Schema, it's very simple
+to handle XML in Perl. Basically, once you have a XML Schema, you can
+think just in Perl data structures that will be
+serialized/deserialized from/to XML with associated validation.</P>
+
+<P>That being said, let's proceed to our map format, which is going to
+be expressed as a XML Schema Definition:</P>
+
+<PRE>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;xs:schema
+   xmlns:xs="http://www.w3.org/2001/XMLSchema"
+   targetNamespace="http://daniel.ruoso.com/categoria/perl/games-perl-7"
+   elementFormDefault="qualified"&gt;
+  &lt;xs:element name="map"&gt;
+    &lt;xs:complexType&gt;
+      &lt;xs:sequence&gt;
+        &lt;xs:element name="ball"&gt;
+          &lt;xs:complexType&gt;
+            &lt;xs:attribute name="radius" type="xs:float" /&gt;
+            &lt;xs:attribute name="x" type="xs:float" /&gt;
+            &lt;xs:attribute name="y" type="xs:float" /&gt;
+          &lt;/xs:complexType&gt;
+        &lt;/xs:element&gt;
+        &lt;xs:element name="goal"&gt;
+          &lt;xs:complexType&gt;
+            &lt;xs:attribute name="x" type="xs:float" /&gt;
+            &lt;xs:attribute name="y" type="xs:float" /&gt;
+          &lt;/xs:complexType&gt;
+        &lt;/xs:element&gt;
+        &lt;xs:element name="wall" maxOccurs="unbounded"&gt;
+          &lt;xs:complexType&gt;
+            &lt;xs:attribute name="x" type="xs:float" /&gt;
+            &lt;xs:attribute name="y" type="xs:float" /&gt;
+            &lt;xs:attribute name="w" type="xs:float" /&gt;
+            &lt;xs:attribute name="h" type="xs:float" /&gt;
+          &lt;/xs:complexType&gt;
+        &lt;/xs:element&gt;
+      &lt;/xs:sequence&gt;
+    &lt;/xs:complexType&gt;
+  &lt;/xs:element&gt;
+&lt;/xs:schema&gt;
+</PRE>
+
+<P>What the above means is:</P>
+
+<UL>
+ <LI>The root element is "map", it is composed as a sequence.
+ <LI>The first element in the "map" sequence is "ball", it should appear once
+     and only once, it has "radius", "x" and "y" as attributes.</LI>
+ <LI>The second element is "goal" it also should appear only once and has "x"
+     and "y" as attributes.
+ <LI>Finally, the third element is "wall" which can happen more than once and has
+     "x", "y", "w" and "h" as attributes.</LI>
+</UL>
+
+<P>In Perl data structures that will mean the following:</P>
+
+<UL>
+ <LI>The main "map" structure is a hash, with "ball", "goal" and
+     "wall" as keys.
+ <LI>The value for "ball" will be another hash, with "radius", "x" and "y"
+     as keys and the floats as values</LI>
+ <LI>The value for "goal" will be another hash, with "x" and "y" as keys
+     and the floats as values</LI>
+ <LI>The value for "wall" is going to be an arrayref containing one hash
+     for each wall define, where those will have "x", "y", "w" and "h" as
+     keys with the floats as values</LI>
+</UL>
+
+<P>The map currently implemented in Perl code would be the following
+perl structure:</P>
+
+<PRE>
+{ ball => { radius  => 0.5,
+            x       => 4,
+            y       => 10 },
+  goal => { x       => 10,
+            y       => 12.5 },
+  wall => [{ x => 0, y => 0, w => 20, h => 1 },
+           { x => 0, y => 0, h => 20, w => 1 },
+           { x => 20, y => 0, h => 20, w => 1 },
+           { x => 0, y => 20, w => 21, h => 1 },
+           { x => 7, y => 0, h => 9, w => 1 },
+           { x => 7, y => 11, h => 9, w => 1 },
+           { x => 12, y => 0, h => 9, w => 1 },
+           { x => 12, y => 11, h => 9, w => 1 },
+           { x => 9.2, y => 11, h => 1, 1.6 } ] }
+</PRE>
+
+<P>That same structure as XML looks like:</P>
+
+<PRE>
+&lt;?xml version="1.0"?&gt;
+&lt;map xmlns="http://daniel.ruoso.com/categoria/perl/games-perl-7"&gt;
+ &lt;ball radius="0.5" x="4" y="10"/&gt;
+ &lt;goal x="10" y="12.5"/&gt;
+ &lt;wall x="0" y="0" w="20" h="1"/&gt;
+ &lt;wall x="0" y="0" w="1" h="20"/&gt;
+ &lt;wall x="20" y="0" w="1" h="20"/&gt;
+ &lt;wall x="0" y="20" w="21" h="1"/&gt;
+ &lt;wall x="7" y="0" w="1" h="9"/&gt;
+ &lt;wall x="7" y="11" w="1" h="9"/&gt;
+ &lt;wall x="12" y="0" w="1" h="9"/&gt;
+ &lt;wall x="12" y="11" w="1" h="9"/&gt;
+ &lt;wall x="9.2" y="11" w="1.6" h="1"/&gt;
+&lt;/map&gt;
+</PRE>
+
+<P>With the advantage that non-Perl-Programmers can edit this map in a
+very confortable way. They can even validate the XML outside our game
+by using the XML Schema.</P>
+
+<P>We're going to use a "maps" directory where we're going to load the
+maps in alphabetical order, so I'm going to save it as
+"00_original_map.xml".</P>
+
+<h3>Loading the map</h3>
+

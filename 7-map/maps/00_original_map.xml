@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<map xmlns="http://daniel.ruoso.com/categoria/perl/games-perl-7">
+ <ball radius="0.5" x="4" y="10"/>
+ <goal x="10" y="12.5"/>
+ <wall x="0" y="0" w="20" h="1"/>
+ <wall x="0" y="0" w="1" h="20"/>
+ <wall x="20" y="0" w="1" h="20"/>
+ <wall x="0" y="20" w="21" h="1"/>
+ <wall x="7" y="0" w="1" h="9"/>
+ <wall x="7" y="11" w="1" h="9"/>
+ <wall x="12" y="0" w="1" h="9"/>
+ <wall x="12" y="11" w="1" h="9"/>
+ <wall x="9.2" y="11" w="1.6" h="1"/>
+</map>
