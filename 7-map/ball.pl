@@ -21,9 +21,12 @@ my $surf = MainSurface->new();
 
 my $sevent = SDL::Event->new();
 my $time = SDL::get_ticks;
+my $first_time = $time;
+
+my @maps = sort <maps/*.xml>;
 
 my $controller = InGame->new({ main_surface => $surf,
-                               mapname => 'maps/00_original_map.xml' });
+                               mapname => shift @maps });
 
 while (1) {
     my $oldtime = $time;
@@ -33,6 +36,15 @@ while (1) {
         my $type = $sevent->type;
         if ($type == SDL_QUIT) {
             exit;
+        } elsif ($type == SDL_USEREVENT) {
+            my $nextmap = shift @maps;
+            if ($nextmap) {
+                $controller = InGame->new({ main_surface => $surf,
+                                            mapname => $nextmap });
+            } else {
+                print 'Finished course in '.(($now - $first_time)/1000)."\n";
+                exit;
+            }
         } elsif ($controller->handle_sdl_event($sevent)) {
             # handled.
         } else {

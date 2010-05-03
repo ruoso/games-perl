@@ -139,7 +139,7 @@ by using the XML Schema.</P>
 
 <P>We're going to use a "maps" directory where we're going to load the
 maps in alphabetical order, so I'm going to save it as
-"00_original_map.xml".</P>
+"zz_original_map.xml".</P>
 
 <h3>Loading the map</h3>
 
@@ -175,7 +175,7 @@ first map in the controller ->new call:</P>
 
 <PRE>
 my $controller = InGame->new({ main_surface => $surf,
-                               mapname => 'maps/00_original_map.xml' });
+                               mapname => 'maps/zz_original_map.xml' });
 </PRE>
 
 
@@ -272,4 +272,67 @@ main application that the goal for this controller instance was
 already achieved and that it should initialize the next
 controller.</P>
 
-<P>To do that, we 
+<P>So, first we're going to fire the event in the InGame controller as
+soon as the ball reaches the goal:</P>
+
+<PRE>
+    if (collide_goal($ball, $self->goal, $frame_elapsed_time)) {
+        my $event = SDL::Event->new();
+        $event->type( SDL_USEREVENT );
+        SDL::Events::push_event($event);
+    }
+</PRE>
+
+<P>We're not doing putting any additional data in the event because
+this is the only user event we have in the game, we could use the
+event_code and the two pointers for data in the SDL::Event if we
+wanted to have a better qualification of the event.</P>
+
+<P>Now we just need to handle that event. First, we're going to get the list
+of available maps in the beggining of ball.pl:</P>
+
+<PRE>
+my @maps = sort <maps/*.xml>;
+</PRE>
+
+<P>Then we're going to replace the hard-coded map selection with
+the first map in that array.</P>
+
+<PRE>
+my $controller = InGame->new({ main_surface => $surf,
+                               mapname => shift @maps });
+</PRE>
+
+<P>And, finally, handle the SDL_USEREVENT replacing the controller
+with a new instance while there are still maps in @maps.</P>
+
+<PRE>
+    while (SDL::Events::poll_event($sevent)) {
+        my $type = $sevent->type;
+        if ($type == SDL_QUIT) {
+            exit;
+            my $nextmap = shift @maps;
+            if ($nextmap) {
+                $controller = InGame->new({ main_surface => $surf,
+                                            mapname => $nextmap });
+            } else {
+                print 'Finished course in '.(($now - $first_time)/1000)."\n";
+                exit;
+            }
+        } elsif ($controller->handle_sdl_event($sevent)) {
+            # handled.
+        } else {
+            # unknown event.
+        }
+    }
+</PRE>
+
+<P>As usual, follows a small video of the game, where it starts in one
+map and when the goal is achieved, the second map is loaded.</P>
+
+<object width="480" height="385"><param name="movie"
+value="http://www.youtube.com/v/GYLqmoKwG3A&hl=pt_BR&fs=1&"></param><param name="allowFullScreen"
+value="true"></param><param name="allowscriptaccess"
+value="always"></param><embed src="http://www.youtube.com/v/GYLqmoKwG3A&hl=pt_BR&fs=1&"
+type="application/x-shockwave-flash" allowscriptaccess="always"
+allowfullscreen="true" width="480" height="385"></embed></object>

@@ -2,6 +2,7 @@ package BouncingBall::Controller::InGame;
 use Moose;
 use MooseX::Types::Moose qw(ArrayRef);
 
+use SDL::Event;
 use SDL::Events ':all';
 use aliased 'BouncingBall::Model::Ball';
 use aliased 'BouncingBall::Model::Wall';
@@ -166,6 +167,8 @@ sub reset_ball {
     $self->ball->cen_h($default->cen_h);
 }
 
+my $frame = 0;
+my $save_video = 0;
 sub handle_frame {
     my ($self, $oldtime, $now) = @_;
 
@@ -199,7 +202,9 @@ sub handle_frame {
     }
 
     if (collide_goal($ball, $self->goal, $frame_elapsed_time)) {
-        $self->reset_ball();
+        my $event = SDL::Event->new();
+        $event->type( SDL_USEREVENT );
+        SDL::Events::push_event($event);
     }
 
     $ball->time_lapse($oldtime, $now);
@@ -207,6 +212,14 @@ sub handle_frame {
 
     foreach my $view (@{$self->views}) {
         my $ret = $view->draw();
+    }
+
+    if ($save_video) {
+        my $filename =  sprintf('/tmp/video_out/output_%010d.bmp',$frame++);
+        my $ret = SDL::Video::save_BMP( $self->main_surface->surface, $filename);
+        if ((not defined $ret) || ($ret != 0)) {
+            warn 'Error saving '.$filename.': '.SDL::get_error();
+        }
     }
 
     SDL::Video::flip($self->main_surface->surface);

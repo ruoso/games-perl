@@ -6,7 +6,7 @@ use SDL::Video;# ':all';
 has 'surface' => (is => 'rw');
 has 'width' => (is => 'ro', default => 800);
 has 'height' => (is => 'ro', default => 600);
-has 'depth' => (is => 'ro', default => 32);
+has 'depth' => (is => 'ro', default => 16);
 
 sub BUILD {
     my ($self) = @_;
